@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Phone on PC — Zero-Lag Wireless Screen Mirror</title>
+  <meta name="description" content="Free, private, peer-to-peer WebRTC screen mirroring from your phone to your PC. No servers storing video, no malware, zero install." />
+  <meta name="theme-color" content="#09090b" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #09090b;
+      color: #f4f4f5;
+      overflow-x: hidden;
+    }
+    .glass-panel {
+      background: rgba(24, 24, 27, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .phone-bezel {
+      border: 10px solid #18181b;
+      border-radius: 36px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12);
+      position: relative;
+      overflow: hidden;
+      background: #000;
+    }
+    .phone-bezel::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 68px;
+      height: 18px;
+      background: #09090b;
+      border-radius: 999px;
+      z-index: 20;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .borderless-frame {
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    #qrBox img, #qrBox canvas {
+      margin: 0 auto;
+      border-radius: 10px;
+    }
+    @keyframes pulseRing {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      70% { transform: scale(1.15); opacity: 0; }
+      100% { transform: scale(0.95); opacity: 0; }
+    }
+    .pulse-ring {
+      animation: pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 selection:bg-emerald-500/30">
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- Top Navigation -->
+  <header class="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+          <svg class="w-5 h-5 text-zinc-950" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <rect x="7" y="2" width="10" height="20" rx="2.5" />
+            <path d="M12 18h.01" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white truncate">Phone on PC</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">P2P WebRTC</span>
+          </div>
+          <p class="text-xs text-zinc-400 truncate hidden sm:block">Direct local Wi-Fi mirroring • Zero cloud video storage</p>
+        </div>
+      </div>
+
+      <!-- Mode Switcher -->
+      <div class="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-800 shrink-0">
+        <button id="tabReceiver" type="button" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all bg-zinc-800 text-white shadow-sm">
+          PC Receiver
+        </button>
+        <button id="tabSender" type="button" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-zinc-400 hover:text-white">
+          Phone Sender
+        </button>
+        <button id="tabGuide" type="button" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-zinc-400 hover:text-white hidden sm:inline-flex">
+          Deploy Guide
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ==================== PC RECEIVER VIEW ==================== -->
+    <section id="viewReceiver" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Left Column: Connection & Controls -->
+      <div class="lg:col-span-4 space-y-4">
+
+        <!-- Pairing Card -->
+        <div class="glass-panel rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+              <span id="statusText" class="text-sm font-medium text-zinc-200">Initializing P2P...</span>
+            </div>
+            <button id="btnRegenerateId" type="button" title="Generate new pairing code" class="text-xs text-zinc-400 hover:text-white px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition">
+              New Code
+            </button>
+          </div>
+
+          <!-- QR Code Display -->
+          <div class="bg-white p-3.5 rounded-2xl w-fit mx-auto shadow-inner">
+            <div id="qrBox" class="w-40 h-40 flex items-center justify-center text-zinc-900 text-xs font-mono">
+              Generating QR...
+            </div>
+          </div>
+
+          <!-- Room Code Box -->
+          <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3 flex items-center justify-between gap-2">
+            <div>
+              <div class="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">Pairing Code</div>
+              <div id="roomCodeDisplay" class="font-mono text-xl font-bold tracking-widest text-emerald-400">------</div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button id="btnCopyCode" type="button" class="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 transition">
+                Copy Code
+              </button>
+              <button id="btnCopyLink" type="button" class="px-3 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-xs font-medium text-emerald-400 border border-emerald-500/20 transition">
+                Copy Link
+              </button>
+            </div>
+          </div>
+
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Open this same website on your phone, tap <strong class="text-zinc-200">Phone Sender</strong>, and enter the 6-character code (or scan the QR code when hosted on Vercel).
+          </p>
+
+          <!-- Demo Mode Button -->
+          <div class="pt-1 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+            <button id="btnDemoStream" type="button" class="w-full py-2.5 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 text-xs font-medium text-zinc-200 transition flex items-center justify-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>Test Interactive Demo Stream</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Telemetry Card -->
+        <div class="glass-panel rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Stream Telemetry</h2>
+            <span id="streamTypeBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">IDLE</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-xl p-2.5">
+              <div class="text-[11px] text-zinc-500">Resolution</div>
+              <div id="statRes" class="font-mono text-xs sm:text-sm font-semibold text-zinc-200 mt-0.5">--</div>
+            </div>
+            <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-xl p-2.5">
+              <div class="text-[11px] text-zinc-500">Frame Rate</div>
+              <div id="statFps" class="font-mono text-xs sm:text-sm font-semibold text-zinc-200 mt-0.5">--</div>
+            </div>
+            <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-xl p-2.5">
+              <div class="text-[11px] text-zinc-500">Latency</div>
+              <div id="statRtt" class="font-mono text-xs sm:text-sm font-semibold text-zinc-200 mt-0.5">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Clipboard / Text Sync -->
+        <div class="glass-panel rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">P2P Clipboard Sync</h2>
+            <span id="dataChannelStatus" class="text-[11px] text-zinc-500">Not paired</span>
+          </div>
+          <div class="flex gap-2">
+            <input id="pcClipInput" type="text" placeholder="Send URL or text to phone..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/60" />
+            <button id="btnPcSendClip" type="button" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition shrink-0">
+              Send
+            </button>
+          </div>
+          <div id="pcClipLog" class="space-y-1.5 max-h-28 overflow-y-auto text-xs text-zinc-400"></div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Mirror Stage -->
+      <div class="lg:col-span-8 flex flex-col gap-4">
+
+        <!-- Stage Toolbar -->
+        <div class="glass-panel rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button id="btnRotate" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+              <span>Rotate (<span id="rotateLabel">0°</span>)</span>
+            </button>
+            <button id="btnFlip" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
+              Flip H
+            </button>
+            <button id="btnBezel" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-emerald-400 transition">
+              Phone Frame: On
+            </button>
+            <button id="btnFitMode" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
+              Fit: Contain
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button id="btnScreenshot" type="button" disabled class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span>Screenshot</span>
+            </button>
+            <button id="btnRecord" type="button" disabled class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5">
+              <span id="recDot" class="w-2 h-2 rounded-full bg-rose-500"></span>
+              <span id="recLabel">Record</span>
+            </button>
+            <button id="btnMute" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
+              Audio: On
+            </button>
+            <button id="btnPiP" type="button" disabled class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition">
+              PiP
+            </button>
+            <button id="btnFullscreen" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition">
+              Fullscreen
+            </button>
+            <button id="btnDisconnectReceiver" type="button" class="hidden px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-xs font-semibold text-white transition">
+              Stop
+            </button>
+          </div>
+        </div>
+
+        <!-- Video Stage -->
+        <div id="stageContainer" class="glass-panel rounded-2xl p-4 sm:p-8 min-h-[480px] sm:min-h-[580px] flex items-center justify-center relative overflow-hidden">
+          <!-- Idle Placeholder -->
+          <div id="stageIdle" class="text-center max-w-md space-y-4 py-8">
+            <div class="relative w-20 h-20 mx-auto flex items-center justify-center">
+              <div class="absolute inset-0 rounded-full bg-emerald-500/20 pulse-ring"></div>
+              <div class="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <rect x="7" y="2" width="10" height="20" rx="2.5" />
+                  <path d="M12 18h.01" stroke-linecap="round" />
+                </svg>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-white">Ready for Your Phone</h3>
+              <p class="text-sm text-zinc-400 mt-1">
+                Scan the QR code or enter the pairing code on your phone to start mirroring at up to 60 FPS over your local Wi-Fi.
+              </p>
+            </div>
+            <div class="flex flex-wrap justify-center gap-2 text-xs text-zinc-400">
+              <span class="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">Encrypted WebRTC</span>
+              <span class="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">No Video Server</span>
+              <span class="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">PNG &amp; WebM Capture</span>
+            </div>
+          </div>
+
+          <!-- Active Video Wrapper -->
+          <div id="videoFrame" class="hidden phone-bezel transition-all duration-300 flex items-center justify-center max-h-[75vh]">
+            <video id="remoteVideo" autoplay playsinline class="max-h-[72vh] max-w-full object-contain transition-transform duration-300"></video>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== PHONE SENDER VIEW ==================== -->
+    <section id="viewSender" class="hidden max-w-xl mx-auto space-y-5">
+      <div class="glass-panel rounded-2xl p-6 space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-white">Send Phone Screen to PC</h2>
+            <p class="text-xs text-zinc-400 mt-0.5">Enter the 6-character code shown on your PC screen.</p>
+          </div>
+          <span id="senderBadge" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-900 text-zinc-400 border border-zinc-800">Standby</span>
+        </div>
+
+        <!-- Target Room Input -->
+        <div class="space-y-2">
+          <label for="targetCodeInput" class="block text-xs font-medium text-zinc-300">PC Pairing Code</label>
+          <input id="targetCodeInput" type="text" maxlength="12" placeholder="e.g. A7K9P2" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 font-mono text-lg tracking-widest uppercase text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500" />
+        </div>
+
+        <!-- Quality & Source Controls -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label for="qualitySelect" class="block text-xs font-medium text-zinc-300">Stream Quality</label>
+            <select id="qualitySelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500">
+              <option value="ultra">1080p • 60 FPS (Lowest Lag)</option>
+              <option value="balanced" selected>720p • 60 FPS (Recommended)</option>
+              <option value="battery">720p • 30 FPS (Battery Saver)</option>
+            </select>
+          </div>
+          <div class="space-y-1.5">
+            <label for="sourceSelect" class="block text-xs font-medium text-zinc-300">Capture Source</label>
+            <select id="sourceSelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500">
+              <option value="screen">Full Phone Screen (Android)</option>
+              <option value="camera_back">Rear Camera (Document/Desk)</option>
+              <option value="camera_front">Front Camera (Webcam Mode)</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
+          <input id="chkAudio" type="checkbox" checked class="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-0" />
+          <span>Include device/microphone audio when supported</span>
+        </label>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3 pt-1">
+          <button id="btnStartMirror" type="button" class="flex-1 py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-zinc-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition">
+            Start Screen Mirroring
+          </button>
+          <button id="btnStopMirror" type="button" class="hidden flex-1 py-3.5 px-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm transition">
+            Stop Mirroring
+          </button>
+        </div>
+
+        <!-- Local Preview -->
+        <div id="senderPreviewWrap" class="hidden rounded-xl overflow-hidden border border-zinc-800 bg-black">
+          <video id="localPreview" autoplay muted playsinline class="w-full max-h-56 object-contain"></video>
+        </div>
+
+        <!-- Sender Clipboard -->
+        <div id="senderClipBox" class="hidden pt-3 border-t border-zinc-800 space-y-2">
+          <div class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Clipboard Sync</div>
+          <div class="flex gap-2">
+            <input id="phoneClipInput" type="text" placeholder="Send text to PC..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500" />
+            <button id="btnPhoneSendClip" type="button" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition">
+              Send
+            </button>
+          </div>
+          <div id="phoneClipLog" class="space-y-1 text-xs text-zinc-400 max-h-24 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- Platform Compatibility Note -->
+      <div class="glass-panel rounded-2xl p-4 text-xs text-zinc-400 space-y-1.5">
+        <div class="font-semibold text-zinc-200">Device Compatibility Note</div>
+        <p><strong class="text-emerald-400">Android (Chrome / Edge / Brave):</strong> Full screen mirroring works natively right inside the browser.</p>
+        <p><strong class="text-amber-400">iPhone / iPad (iOS Safari):</strong> Apple blocks browser screen capture (<code>getDisplayMedia</code>) on iOS. You can still use <em>Rear/Front Camera</em> mode here, or use AirPlay / USB cable for full iOS screen mirroring.</p>
+      </div>
+    </section>
+
+    <!-- ==================== SETUP & DEPLOY GUIDE VIEW ==================== -->
+    <section id="viewGuide" class="hidden max-w-4xl mx-auto space-y-5">
+      <div class="glass-panel rounded-2xl p-6 space-y-5">
+        <div>
+          <h2 class="text-xl font-bold text-white">Deploy Free on GitHub &amp; Vercel</h2>
+          <p class="text-sm text-zinc-400 mt-1">This app is 100% static HTML/JS with zero paid servers and zero malware.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-2">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 font-bold text-sm flex items-center justify-center">1</div>
+            <h3 class="text-sm font-semibold text-white">Save as index.html</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Click <strong>Export</strong> or copy this single file, save it as <code>index.html</code>, and push it to a free GitHub repository.</p>
+          </div>
+          <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-2">
+            <div class="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-400 font-bold text-sm flex items-center justify-center">2</div>
+            <h3 class="text-sm font-semibold text-white">Deploy on Vercel</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Log into Vercel.com with GitHub, click <strong>Add New Project</strong>, select your repo, and click <strong>Deploy</strong>. Free HTTPS URL in 30 seconds.</p>
+          </div>
+          <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-2">
+            <div class="w-7 h-7 rounded-lg bg-violet-500/15 text-violet-400 font-bold text-sm flex items-center justify-center">3</div>
+            <h3 class="text-sm font-semibold text-white">Zero-Lag Wi-Fi Tips</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Keep both Phone and PC on the same 5GHz Wi-Fi network. WebRTC routes video directly between devices on your LAN.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-zinc-900 py-4 text-center text-xs text-zinc-500">
+    Phone on PC • Open-standard WebRTC P2P • No account, no tracking, no video stored on any server.
+  </footer>
+
+  <script>
+    (() => {
+      // ==================== STATE ====================
+      const state = {
+        mode: 'receiver',
+        roomCode: '',
+        peer: null,
+        activeCall: null,
+        dataConn: null,
+        remoteStream: null,
+        localStream: null,
+        demoInterval: null,
+        statsInterval: null,
+        mediaRecorder: null,
+        recordedChunks: [],
+        isRecording: false,
+        rotation: 0,
+        flipped: false,
+        showBezel: true,
+        fitContain: true,
+        isMuted: false
+      };
+
+      const PEER_PREFIX = 'popc-v1-';
+
+      // Detect if running inside a restricted sandboxed iframe where external WebSockets are blocked
+      function isRestrictedSandbox() {
+        try {
+          if (window.location.protocol === 'about:' || window.location.protocol === 'blob:' || window.location.protocol === 'data:') {
+            return true;
+          }
+          if (window.self !== window.top && (!window.location.hostname || window.location.origin === 'null')) {
+            return true;
+          }
+        } catch (e) {
+          return true;
+        }
+        return false;
+      }
+
+      // Cross-browser rounded rectangle helper for canvas rendering
+      function drawRoundedRect(ctx, x, y, width, height, radius) {
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(x, y, width, height, radius);
+          return;
+        }
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+      }
+
+      // ==================== DOM ====================
+      const el = (id) => document.getElementById(id);
+
+      const tabReceiver = el('tabReceiver');
+      const tabSender = el('tabSender');
+      const tabGuide = el('tabGuide');
+      const viewReceiver = el('viewReceiver');
+      const viewSender = el('viewSender');
+      const viewGuide = el('viewGuide');
+
+      const statusDot = el('statusDot');
+      const statusText = el('statusText');
+      const roomCodeDisplay = el('roomCodeDisplay');
+      const qrBox = el('qrBox');
+      const btnRegenerateId = el('btnRegenerateId');
+      const btnCopyCode = el('btnCopyCode');
+      const btnCopyLink = el('btnCopyLink');
+      const btnDemoStream = el('btnDemoStream');
+
+      const stageIdle = el('stageIdle');
+      const videoFrame = el('videoFrame');
+      const remoteVideo = el('remoteVideo');
+      const stageContainer = el('stageContainer');
+
+      const btnRotate = el('btnRotate');
+      const rotateLabel = el('rotateLabel');
+      const btnFlip = el('btnFlip');
+      const btnBezel = el('btnBezel');
+      const btnFitMode = el('btnFitMode');
+      const btnScreenshot = el('btnScreenshot');
+      const btnRecord = el('btnRecord');
+      const recDot = el('recDot');
+      const recLabel = el('recLabel');
+      const btnMute = el('btnMute');
+      const btnPiP = el('btnPiP');
+      const btnFullscreen = el('btnFullscreen');
+      const btnDisconnectReceiver = el('btnDisconnectReceiver');
+
+      const streamTypeBadge = el('streamTypeBadge');
+      const statRes = el('statRes');
+      const statFps = el('statFps');
+      const statRtt = el('statRtt');
+
+      const dataChannelStatus = el('dataChannelStatus');
+      const pcClipInput = el('pcClipInput');
+      const btnPcSendClip = el('btnPcSendClip');
+      const pcClipLog = el('pcClipLog');
+
+      const targetCodeInput = el('targetCodeInput');
+      const qualitySelect = el('qualitySelect');
+      const sourceSelect = el('sourceSelect');
+      const chkAudio = el('chkAudio');
+      const btnStartMirror = el('btnStartMirror');
+      const btnStopMirror = el('btnStopMirror');
+      const senderBadge = el('senderBadge');
+      const senderPreviewWrap = el('senderPreviewWrap');
+      const localPreview = el('localPreview');
+      const senderClipBox = el('senderClipBox');
+      const phoneClipInput = el('phoneClipInput');
+      const btnPhoneSendClip = el('btnPhoneSendClip');
+      const phoneClipLog = el('phoneClipLog');
+
+      // ==================== UTILITIES ====================
+      function showToast(msg, type = 'info') {
+        const colors = {
+          info: 'border-zinc-700 bg-zinc-900 text-zinc-100',
+          success: 'border-emerald-500/40 bg-emerald-950/90 text-emerald-200',
+          error: 'border-rose-500/40 bg-rose-950/90 text-rose-200',
+          warn: 'border-amber-500/40 bg-amber-950/90 text-amber-200'
+        };
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto px-4 py-3 rounded-xl border text-xs font-medium shadow-xl backdrop-blur-md transition-all ${colors[type] || colors.info}`;
+        toast.textContent = msg;
+        el('toastContainer').appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(6px)';
+          setTimeout(() => toast.remove(), 250);
+        }, 3200);
+      }
+
+      function copyText(text, label) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(
+            () => showToast(`${label} copied!`, 'success'),
+            () => fallbackCopy(text, label)
+          );
+        } else {
+          fallbackCopy(text, label);
+        }
+      }
+
+      function fallbackCopy(text, label) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          showToast(`${label} copied!`, 'success');
+        } catch (err) {
+          showToast('Copy failed. Please copy manually.', 'error');
+        }
+      }
+
+      function generateCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let out = '';
+        for (let i = 0; i < 6; i++) {
+          out += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return out;
+      }
+
+      function getShareUrl() {
+        try {
+          const u = new URL(window.location.href);
+          if (u.protocol === 'http:' || u.protocol === 'https:') {
+            u.searchParams.set('join', state.roomCode);
+            return u.toString();
+          }
+        } catch (e) {}
+        return `https://your-app.vercel.app/?join=${state.roomCode}`;
+      }
+
+      function renderQr() {
+        qrBox.innerHTML = '';
+        if (typeof QRCode === 'undefined') {
+          qrBox.textContent = state.roomCode;
+          return;
+        }
+        try {
+          new QRCode(qrBox, {
+            text: getShareUrl(),
+            width: 152,
+            height: 152,
+            colorDark: '#09090b',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch (e) {
+          qrBox.textContent = state.roomCode;
+        }
+      }
+
+      function setReceiverStatus(label, color) {
+        const dotMap = {
+          amber: 'bg-amber-400',
+          emerald: 'bg-emerald-400',
+          cyan: 'bg-cyan-400',
+          rose: 'bg-rose-500'
+        };
+        statusDot.className = `w-2.5 h-2.5 rounded-full ${dotMap[color] || 'bg-zinc-400'}`;
+        statusText.textContent = label;
+      }
+
+      // ==================== TAB SWITCHING ====================
+      function switchTab(mode) {
+        state.mode = mode;
+        viewReceiver.classList.toggle('hidden', mode !== 'receiver');
+        viewSender.classList.toggle('hidden', mode !== 'sender');
+        viewGuide.classList.toggle('hidden', mode !== 'guide');
+
+        const activeCls = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all bg-zinc-800 text-white shadow-sm';
+        const idleCls = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-zinc-400 hover:text-white';
+
+        tabReceiver.className = mode === 'receiver' ? activeCls : idleCls;
+        tabSender.className = mode === 'sender' ? activeCls : idleCls;
+        tabGuide.className = `${mode === 'guide' ? activeCls : idleCls} hidden sm:inline-flex`;
+      }
+
+      tabReceiver.addEventListener('click', () => switchTab('receiver'));
+      tabSender.addEventListener('click', () => switchTab('sender'));
+      tabGuide.addEventListener('click', () => switchTab('guide'));
+
+      // ==================== PEERJS RECEIVER ====================
+      function initReceiverPeer() {
+        if (state.peer) {
+          try { state.peer.destroy(); } catch (e) {}
+          state.peer = null;
+        }
+        state.roomCode = generateCode();
+        roomCodeDisplay.textContent = state.roomCode;
+        renderQr();
+
+        if (typeof Peer === 'undefined' || isRestrictedSandbox()) {
+          setReceiverStatus('Preview Mode (Deploy to Vercel for P2P)', 'amber');
+          return;
+        }
+
+        setReceiverStatus('Connecting signaling...', 'amber');
+        let peer;
+        try {
+          peer = new Peer(PEER_PREFIX + state.roomCode, {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+              ]
+            }
+          });
+        } catch (err) {
+          setReceiverStatus('Preview Mode (Deploy to Vercel for P2P)', 'amber');
+          return;
+        }
+        state.peer = peer;
+
+        peer.on('open', () => {
+          setReceiverStatus('Waiting for phone...', 'emerald');
+        });
+
+        peer.on('connection', (conn) => {
+          state.dataConn = conn;
+          dataChannelStatus.textContent = 'Paired';
+          dataChannelStatus.className = 'text-[11px] text-emerald-400 font-medium';
+          conn.on('data', (data) => {
+            if (data && data.type === 'clip') {
+              appendClipLog(pcClipLog, 'Phone', data.text);
+              showToast('Received text from phone', 'info');
+            }
+          });
+          conn.on('close', () => {
+            dataChannelStatus.textContent = 'Disconnected';
+            dataChannelStatus.className = 'text-[11px] text-zinc-500';
+          });
+        });
+
+        peer.on('call', (call) => {
+          stopDemoStream(true);
+          state.activeCall = call;
+          setReceiverStatus('Incoming phone stream...', 'cyan');
+          call.answer();
+          call.on('stream', (stream) => {
+            attachReceiverStream(stream, 'LIVE P2P');
+            setReceiverStatus('Mirroring Live (P2P)', 'emerald');
+            showToast('Phone connected!', 'success');
+            startRtcStatsLoop(call.peerConnection);
+          });
+          call.on('close', () => {
+            clearReceiverStream();
+            setReceiverStatus('Phone disconnected', 'amber');
+          });
+          call.on('error', () => {
+            clearReceiverStream();
+            setReceiverStatus('Stream error', 'rose');
+          });
+        });
+
+        peer.on('error', (err) => {
+          if (err && err.type === 'unavailable-id') {
+            initReceiverPeer();
+          } else {
+            setReceiverStatus('Signaling limited (use Demo or reload)', 'amber');
+          }
+        });
+      }
+
+      function attachReceiverStream(stream, badgeText) {
+        state.remoteStream = stream;
+        remoteVideo.srcObject = stream;
+        remoteVideo.muted = state.isMuted;
+        stageIdle.classList.add('hidden');
+        videoFrame.classList.remove('hidden');
+        btnScreenshot.disabled = false;
+        btnRecord.disabled = false;
+        btnPiP.disabled = false;
+        btnDisconnectReceiver.classList.remove('hidden');
+        streamTypeBadge.textContent = badgeText;
+        streamTypeBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+        updateVideoTransform();
+      }
+
+      function clearReceiverStream() {
+        if (state.statsInterval) {
+          clearInterval(state.statsInterval);
+          state.statsInterval = null;
+        }
+        if (state.isRecording) toggleRecording();
+        remoteVideo.srcObject = null;
+        state.remoteStream = null;
+        videoFrame.classList.add('hidden');
+        stageIdle.classList.remove('hidden');
+        btnScreenshot.disabled = true;
+        btnRecord.disabled = true;
+        btnPiP.disabled = true;
+        btnDisconnectReceiver.classList.add('hidden');
+        streamTypeBadge.textContent = 'IDLE';
+        streamTypeBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800';
+        statRes.textContent = '--';
+        statFps.textContent = '--';
+        statRtt.textContent = '--';
+      }
+
+      function startRtcStatsLoop(pc) {
+        if (state.statsInterval) clearInterval(state.statsInterval);
+        state.statsInterval = setInterval(async () => {
+          if (remoteVideo.videoWidth) {
+            statRes.textContent = `${remoteVideo.videoWidth}×${remoteVideo.videoHeight}`;
+          }
+          if (!pc || typeof pc.getStats !== 'function') return;
+          try {
+            const stats = await pc.getStats();
+            stats.forEach((report) => {
+              if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                if (report.framesPerSecond) {
+                  statFps.textContent = `${Math.round(report.framesPerSecond)} fps`;
+                }
+              }
+              if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.currentRoundTripTime != null) {
+                statRtt.textContent = `${Math.round(report.currentRoundTripTime * 1000)} ms`;
+              }
+            });
+          } catch (e) {}
+        }, 1000);
+      }
+
+      // ==================== DEMO STREAM (CANVAS 60FPS) ====================
+      function startDemoStream() {
+        if (state.demoInterval) {
+          stopDemoStream(false);
+          return;
+        }
+        if (state.activeCall) {
+          try { state.activeCall.close(); } catch (e) {}
+          state.activeCall = null;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = 540;
+        canvas.height = 1140;
+        const ctx = canvas.getContext('2d');
+        let frame = 0;
+
+        function drawFrame() {
+          frame++;
+          const grad = ctx.createLinearGradient(0, 0, 540, 1140);
+          grad.addColorStop(0, '#09090b');
+          grad.addColorStop(0.5, '#064e3b');
+          grad.addColorStop(1, '#083344');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 540, 1140);
+
+          // Status bar
+          ctx.fillStyle = '#e4e4e7';
+          ctx.font = '600 22px Inter, sans-serif';
+          const now = new Date();
+          ctx.fillText(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 36, 54);
+          ctx.fillText('5G  100%', 400, 54);
+
+          // Animated Pulse Circle
+          const r = 75 + Math.sin(frame * 0.08) * 14;
+          ctx.beginPath();
+          ctx.arc(270, 360, r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+          ctx.fill();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#34d399';
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '700 34px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Phone on PC', 270, 355);
+          ctx.fillStyle = '#a7f3d0';
+          ctx.font = '500 20px JetBrains Mono, monospace';
+          ctx.fillText('60 FPS DEMO FEED', 270, 392);
+
+          // Simulated App Cards
+          ctx.textAlign = 'left';
+          const cards = [
+            { title: 'Ultra-Low Latency', sub: 'Direct WebRTC Peer-to-Peer', y: 520 },
+            { title: 'Screenshot & Record', sub: 'Try the toolbar buttons above', y: 660 },
+            { title: 'Rotate, Flip & PiP', sub: 'Works in Fullscreen too', y: 800 }
+          ];
+          cards.forEach((c, idx) => {
+            const offset = Math.sin(frame * 0.04 + idx) * 6;
+            ctx.fillStyle = 'rgba(24, 24, 27, 0.82)';
+            drawRoundedRect(ctx, 42, c.y + offset, 456, 110, 22);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '600 24px Inter, sans-serif';
+            ctx.fillText(c.title, 70, c.y + offset + 46);
+            ctx.fillStyle = '#a1a1aa';
+            ctx.font = '400 19px Inter, sans-serif';
+            ctx.fillText(c.sub, 70, c.y + offset + 80);
+          });
+
+          // Home bar
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          drawRoundedRect(ctx, 185, 1105, 170, 8, 4);
+          ctx.fill();
+        }
+
+        drawFrame();
+        state.demoInterval = setInterval(drawFrame, 1000 / 60);
+        const stream = canvas.captureStream(60);
+        attachReceiverStream(stream, 'DEMO 60FPS');
+        statRes.textContent = '540×1140';
+        statFps.textContent = '60 fps';
+        statRtt.textContent = '0 ms';
+        setReceiverStatus('Demo Stream Active', 'cyan');
+        btnDemoStream.querySelector('span').textContent = 'Stop Demo Stream';
+      }
+
+      function stopDemoStream(silent) {
+        if (!state.demoInterval) return;
+        clearInterval(state.demoInterval);
+        state.demoInterval = null;
+        btnDemoStream.querySelector('span').textContent = 'Test Interactive Demo Stream';
+        if (!silent) {
+          clearReceiverStream();
+          setReceiverStatus('Waiting for phone...', 'emerald');
+        }
+      }
+
+      // ==================== STAGE CONTROLS ====================
+      function updateVideoTransform() {
+        const scaleX = state.flipped ? -1 : 1;
+        remoteVideo.style.transform = `rotate(${state.rotation}deg) scaleX(${scaleX})`;
+        remoteVideo.style.objectFit = state.fitContain ? 'contain' : 'cover';
+        rotateLabel.textContent = `${state.rotation}°`;
+        videoFrame.className = `transition-all duration-300 flex items-center justify-center max-h-[75vh] ${state.showBezel ? 'phone-bezel' : 'borderless-frame'}`;
+      }
+
+      btnRotate.addEventListener('click', () => {
+        state.rotation = (state.rotation + 90) % 360;
+        updateVideoTransform();
+      });
+
+      btnFlip.addEventListener('click', () => {
+        state.flipped = !state.flipped;
+        btnFlip.classList.toggle('text-emerald-400', state.flipped);
+        updateVideoTransform();
+      });
+
+      btnBezel.addEventListener('click', () => {
+        state.showBezel = !state.showBezel;
+        btnBezel.textContent = `Phone Frame: ${state.showBezel ? 'On' : 'Off'}`;
+        btnBezel.classList.toggle('text-emerald-400', state.showBezel);
+        updateVideoTransform();
+      });
+
+      btnFitMode.addEventListener('click', () => {
+        state.fitContain = !state.fitContain;
+        btnFitMode.textContent = `Fit: ${state.fitContain ? 'Contain' : 'Cover'}`;
+        updateVideoTransform();
+      });
+
+      btnMute.addEventListener('click', () => {
+        state.isMuted = !state.isMuted;
+        remoteVideo.muted = state.isMuted;
+        btnMute.textContent = `Audio: ${state.isMuted ? 'Muted' : 'On'}`;
+      });
+
+      btnScreenshot.addEventListener('click', () => {
+        if (!remoteVideo.videoWidth) return;
+        const c = document.createElement('canvas');
+        c.width = remoteVideo.videoWidth;
+        c.height = remoteVideo.videoHeight;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(remoteVideo, 0, 0, c.width, c.height);
+        const a = document.createElement('a');
+        a.href = c.toDataURL('image/png');
+        a.download = `phone-mirror-${Date.now()}.png`;
+        a.click();
+        showToast('Screenshot saved as PNG!', 'success');
+      });
+
+      function toggleRecording() {
+        if (!state.remoteStream) return;
+        if (!state.isRecording) {
+          if (typeof MediaRecorder === 'undefined') {
+            showToast('Screen recording is not supported in this browser.', 'error');
+            return;
+          }
+          try {
+            state.recordedChunks = [];
+            const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+            const mime = candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+            const rec = mime ? new MediaRecorder(state.remoteStream, { mimeType: mime }) : new MediaRecorder(state.remoteStream);
+            rec.ondataavailable = (e) => {
+              if (e.data && e.data.size > 0) state.recordedChunks.push(e.data);
+            };
+            rec.onstop = () => {
+              const outType = mime || 'video/webm';
+              const ext = outType.includes('mp4') ? 'mp4' : 'webm';
+              const blob = new Blob(state.recordedChunks, { type: outType });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `phone-recording-${Date.now()}.${ext}`;
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 5000);
+              showToast(`Recording downloaded (.${ext})!`, 'success');
+            };
+            rec.start(250);
+            state.mediaRecorder = rec;
+            state.isRecording = true;
+            recLabel.textContent = 'Stop Rec';
+            recDot.classList.add('animate-ping');
+            showToast('Recording started', 'info');
+          } catch (e) {
+            showToast('Recording not supported for this stream.', 'error');
+          }
+        } else {
+          try { state.mediaRecorder.stop(); } catch (e) {}
+          state.isRecording = false;
+          recLabel.textContent = 'Record';
+          recDot.classList.remove('animate-ping');
+        }
+      }
+
+      btnRecord.addEventListener('click', toggleRecording);
+
+      btnPiP.addEventListener('click', async () => {
+        try {
+          if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture();
+          } else if (remoteVideo.requestPictureInPicture) {
+            await remoteVideo.requestPictureInPicture();
+          } else {
+            showToast('Picture-in-Picture is not supported here.', 'warn');
+          }
+        } catch (e) {
+          showToast('Start a stream first to use PiP.', 'warn');
+        }
+      });
+
+      btnFullscreen.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          if (stageContainer.requestFullscreen) {
+            stageContainer.requestFullscreen().catch(() => showToast('Fullscreen blocked by browser.', 'warn'));
+          }
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      btnDisconnectReceiver.addEventListener('click', () => {
+        stopDemoStream(true);
+        if (state.activeCall) {
+          try { state.activeCall.close(); } catch (e) {}
+          state.activeCall = null;
+        }
+        clearReceiverStream();
+        setReceiverStatus('Waiting for phone...', 'emerald');
+      });
+
+      btnRegenerateId.addEventListener('click', initReceiverPeer);
+      btnCopyCode.addEventListener('click', () => copyText(state.roomCode, 'Pairing code'));
+      btnCopyLink.addEventListener('click', () => copyText(getShareUrl(), 'Pairing link'));
+      btnDemoStream.addEventListener('click', startDemoStream);
+
+      // ==================== CLIPBOARD SYNC ====================
+      function appendClipLog(container, who, text) {
+        const item = document.createElement('div');
+        item.className = 'bg-zinc-900/90 border border-zinc-800 rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2';
+        const span = document.createElement('span');
+        span.className = 'truncate';
+        span.textContent = `${who}: ${text}`;
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'text-[10px] text-emerald-400 hover:underline shrink-0';
+        copyBtn.textContent = 'Copy';
+        copyBtn.addEventListener('click', () => copyText(text, 'Text'));
+        item.appendChild(span);
+        item.appendChild(copyBtn);
+        container.prepend(item);
+      }
+
+      btnPcSendClip.addEventListener('click', () => {
+        const val = pcClipInput.value.trim();
+        if (!val) return;
+        if (state.dataConn && state.dataConn.open) {
+          state.dataConn.send({ type: 'clip', text: val });
+          appendClipLog(pcClipLog, 'PC', val);
+          pcClipInput.value = '';
+        } else {
+          showToast('Connect a phone first to sync clipboard.', 'warn');
+        }
+      });
+
+      // ==================== PHONE SENDER ====================
+      async function getSenderStream() {
+        const q = qualitySelect.value;
+        const src = sourceSelect.value;
+        const wantAudio = chkAudio.checked;
+
+        const constraintsMap = {
+          ultra: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60, max: 60 } },
+          balanced: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60, max: 60 } },
+          battery: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }
+        };
+
+        if (src === 'screen') {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            throw new Error('Screen capture is not supported in this mobile browser. Try Android Chrome or switch Capture Source to Camera.');
+          }
+          try {
+            return await navigator.mediaDevices.getDisplayMedia({
+              video: constraintsMap[q],
+              audio: wantAudio
+            });
+          } catch (err) {
+            return await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+          }
+        } else {
+          const facing = src === 'camera_back' ? 'environment' : 'user';
+          return await navigator.mediaDevices.getUserMedia({
+            video: { ...constraintsMap[q], facingMode: facing },
+            audio: wantAudio
+          });
+        }
+      }
+
+      btnStartMirror.addEventListener('click', async () => {
+        const code = targetCodeInput.value.trim().toUpperCase();
+        if (!code || code.length < 4) {
+          showToast('Enter the 6-character pairing code from your PC.', 'warn');
+          return;
+        }
+        if (typeof Peer === 'undefined') {
+          showToast('P2P library failed to load. Check internet connection.', 'error');
+          return;
+        }
+        if (isRestrictedSandbox()) {
+          showToast('External WebSockets are blocked in sandbox preview. Deploy on Vercel to pair devices!', 'warn');
+          return;
+        }
+
+        try {
+          senderBadge.textContent = 'Requesting screen...';
+          const stream = await getSenderStream();
+          state.localStream = stream;
+          localPreview.srcObject = stream;
+          senderPreviewWrap.classList.remove('hidden');
+
+          stream.getVideoTracks()[0].addEventListener('ended', stopSenderMirror);
+
+          const senderPeer = new Peer({
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+              ]
+            }
+          });
+          state.peer = senderPeer;
+
+          senderPeer.on('open', () => {
+            senderBadge.textContent = 'Connecting to PC...';
+            const targetId = PEER_PREFIX + code;
+
+            const conn = senderPeer.connect(targetId);
+            state.dataConn = conn;
+            conn.on('open', () => {
+              senderClipBox.classList.remove('hidden');
+            });
+            conn.on('data', (data) => {
+              if (data && data.type === 'clip') {
+                appendClipLog(phoneClipLog, 'PC', data.text);
+                showToast('Received text from PC', 'info');
+              }
+            });
+
+            const call = senderPeer.call(targetId, stream);
+            state.activeCall = call;
+            senderBadge.textContent = 'Mirroring Live';
+            senderBadge.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+            btnStartMirror.classList.add('hidden');
+            btnStopMirror.classList.remove('hidden');
+            showToast('Streaming to PC!', 'success');
+          });
+
+          senderPeer.on('error', (err) => {
+            showToast(`Connection error: ${err.type || 'Could not reach PC'}`, 'error');
+            stopSenderMirror();
+          });
+        } catch (err) {
+          senderBadge.textContent = 'Standby';
+          showToast(err.message || 'Permission denied or unsupported browser.', 'error');
+        }
+      });
+
+      function stopSenderMirror() {
+        if (state.localStream) {
+          state.localStream.getTracks().forEach((t) => t.stop());
+          state.localStream = null;
+        }
+        if (state.activeCall) {
+          try { state.activeCall.close(); } catch (e) {}
+          state.activeCall = null;
+        }
+        if (state.peer) {
+          try { state.peer.destroy(); } catch (e) {}
+          state.peer = null;
+        }
+        localPreview.srcObject = null;
+        senderPreviewWrap.classList.add('hidden');
+        senderClipBox.classList.add('hidden');
+        btnStartMirror.classList.remove('hidden');
+        btnStopMirror.classList.add('hidden');
+        senderBadge.textContent = 'Standby';
+        senderBadge.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-900 text-zinc-400 border border-zinc-800';
+      }
+
+      btnStopMirror.addEventListener('click', stopSenderMirror);
+
+      btnPhoneSendClip.addEventListener('click', () => {
+        const val = phoneClipInput.value.trim();
+        if (!val) return;
+        if (state.dataConn && state.dataConn.open) {
+          state.dataConn.send({ type: 'clip', text: val });
+          appendClipLog(phoneClipLog, 'Phone', val);
+          phoneClipInput.value = '';
+        } else {
+          showToast('Not connected to PC yet.', 'warn');
+        }
+      });
+
+      // ==================== INIT ====================
+      window.addEventListener('load', () => {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const joinCode = params.get('join');
+          if (joinCode) {
+            targetCodeInput.value = joinCode.toUpperCase();
+            switchTab('sender');
+            return;
+          }
+          // Automatically switch to Phone Sender on mobile devices
+          if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            switchTab('sender');
+            return;
+          }
+        } catch (e) {}
+        initReceiverPeer();
+      });
+    })();
+  </script>
+</body>
+</html>
