@@ -475,16 +475,24 @@
         <!-- Background & Charging Keep-Alive Controls -->
         <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3.5 space-y-2.5">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-zinc-200">Charging &amp; Low-Power Keep-Alive</span>
+            <span class="text-xs font-semibold text-zinc-200">Android Background &amp; Charging Keep-Alive</span>
             <span id="wakeLockStatus" class="text-[11px] font-mono text-emerald-400">Ready</span>
           </div>
           <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
             <input id="chkWakeLock" type="checkbox" checked class="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-0" />
-            <span>Keep background session alive while charging on desk</span>
+            <span>Keep casting when minimized (Home / switching apps)</span>
           </label>
-          <button id="btnPocketDimmer" type="button" class="w-full py-2 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-cyan-300 transition">
-            Enable OLED Black Screen Saver (Zero Screen Burn-In While Casting)
-          </button>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button id="btnAndroidBgPip" type="button" class="py-2 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-300 transition">
+              Pin Background PiP Anchor
+            </button>
+            <button id="btnPocketDimmer" type="button" class="py-2 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-cyan-300 transition">
+              OLED Black Screen Saver
+            </button>
+          </div>
+          <p class="text-[11px] text-amber-300/90 leading-relaxed">
+            <strong>Important:</strong> Tap <strong>Home</strong> (minimize Chrome) to cast other apps in the background. Do not swipe Chrome away from Recent Apps.
+          </p>
         </div>
 
         <!-- Action Buttons -->
@@ -751,6 +759,7 @@
       const sourceSelect = el('sourceSelect');
       const chkWakeLock = el('chkWakeLock');
       const wakeLockStatus = el('wakeLockStatus');
+      const btnAndroidBgPip = el('btnAndroidBgPip');
       const btnPocketDimmer = el('btnPocketDimmer');
       const oledDimmerOverlay = el('oledDimmerOverlay');
       const dimmerClock = el('dimmerClock');
@@ -1591,15 +1600,48 @@
       });
 
       // ==================== PHONE SENDER + CHARGING KEEP-ALIVE ====================
+      function registerAndroidMediaSession() {
+        try {
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: 'CastDesk Live Screen Cast',
+              artist: 'Casting to PC Desktop Workspace',
+              album: 'Background Keep-Alive Active'
+            });
+            navigator.mediaSession.playbackState = 'playing';
+            navigator.mediaSession.setActionHandler('play', () => {
+              navigator.mediaSession.playbackState = 'playing';
+            });
+            navigator.mediaSession.setActionHandler('pause', () => {
+              // Keep session marked playing so Android OS does not suspend background WebRTC
+              navigator.mediaSession.playbackState = 'playing';
+            });
+            navigator.mediaSession.setActionHandler('stop', () => {
+              stopSenderMirror();
+            });
+          }
+        } catch (e) {}
+      }
+
+      function clearAndroidMediaSession() {
+        try {
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'none';
+            navigator.mediaSession.metadata = null;
+          }
+        } catch (e) {}
+      }
+
       async function enableKeepAlive() {
         if (!chkWakeLock.checked) return;
+        registerAndroidMediaSession();
         try {
           if ('wakeLock' in navigator) {
             state.wakeLock = await navigator.wakeLock.request('screen');
-            wakeLockStatus.textContent = 'WakeLock Active';
+            wakeLockStatus.textContent = 'BG Media + WakeLock';
           }
         } catch (e) {
-          wakeLockStatus.textContent = 'Audio Keep-Alive';
+          wakeLockStatus.textContent = 'BG Media Session';
         }
         try {
           const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -1607,16 +1649,20 @@
             const ctx = new AudioCtx();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-            gain.gain.value = 0.00001;
+            gain.gain.value = 0.0001;
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start();
             state.silentAudioCtx = ctx;
           }
+          if (state.silentAudioCtx && state.silentAudioCtx.state === 'suspended') {
+            await state.silentAudioCtx.resume();
+          }
         } catch (e) {}
       }
 
       function disableKeepAlive() {
+        clearAndroidMediaSession();
         if (state.wakeLock) {
           try { state.wakeLock.release(); } catch (e) {}
           state.wakeLock = null;
@@ -1627,6 +1673,36 @@
         }
         wakeLockStatus.textContent = 'Standby';
       }
+
+      // Re-assert WakeLock & AudioContext whenever Android switches apps or returns to tab
+      document.addEventListener('visibilitychange', () => {
+        if (state.localStream && chkWakeLock.checked) {
+          enableKeepAlive();
+          if (localPreview.paused) {
+            localPreview.play().catch(() => {});
+          }
+        }
+      });
+
+      btnAndroidBgPip.addEventListener('click', async () => {
+        if (!state.localStream) {
+          showToast('Start casting first, then tap Pin Background PiP Anchor.', 'warn');
+          return;
+        }
+        try {
+          if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture();
+            showToast('Background PiP Anchor unpinned.', 'info');
+          } else if (localPreview.requestPictureInPicture) {
+            await localPreview.requestPictureInPicture();
+            showToast('Background PiP Anchor pinned! You can now press Home and open any app.', 'success');
+          } else {
+            showToast('PiP not supported in this browser; Android Media Session is active.', 'warn');
+          }
+        } catch (e) {
+          showToast('Tap the video preview once, then tap Pin Background PiP Anchor.', 'warn');
+        }
+      });
 
       btnPocketDimmer.addEventListener('click', () => {
         oledDimmerOverlay.classList.remove('hidden');
@@ -1751,11 +1827,11 @@
 
             const call = senderPeer.call(targetId, stream);
             state.activeCall = call;
-            senderBadge.textContent = 'Casting Live';
+            senderBadge.textContent = 'Casting Live (BG Ready)';
             senderBadge.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
             btnStartMirror.classList.add('hidden');
             btnStopMirror.classList.remove('hidden');
-            showToast('Full-screen cast started!', 'success');
+            showToast('Cast live! Press Home (do not close Chrome) to use other apps.', 'success');
           });
 
           senderPeer.on('error', (err) => {
