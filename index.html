@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Phone on PC — Zero-Lag Wireless Screen Mirror</title>
-  <meta name="description" content="Free, private, peer-to-peer WebRTC screen mirroring from your phone to your PC. No servers storing video, no malware, zero install." />
+  <title>CastDesk — Full-Screen Phone-to-PC Desktop Workspace &amp; Two-Way Mirror</title>
+  <meta name="description" content="Transform your Android into a Tablet workstation or your iPhone into an iPadOS desktop on your PC in full screen. Zero-lag P2P WebRTC screen casting, two-way remote control, and clipboard sync." />
   <meta name="theme-color" content="#09090b" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -34,20 +34,22 @@
       overflow-x: hidden;
     }
     .glass-panel {
-      background: rgba(24, 24, 27, 0.78);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(24, 24, 27, 0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .phone-bezel {
+
+    /* Adaptive Hardware Shells */
+    .shell-phone {
       border: 10px solid #18181b;
       border-radius: 36px;
-      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.14);
       position: relative;
       overflow: hidden;
       background: #000;
     }
-    .phone-bezel::before {
+    .shell-phone::before {
       content: '';
       position: absolute;
       top: 8px;
@@ -59,19 +61,55 @@
       border-radius: 999px;
       z-index: 20;
       pointer-events: none;
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .borderless-frame {
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+
+    .shell-ipad {
+      border: 14px solid #1c1c1e;
+      border-radius: 28px;
+      box-shadow: 0 30px 75px -15px rgba(0, 0, 0, 0.9), 0 0 0 1.5px rgba(255, 255, 255, 0.16);
+      position: relative;
       overflow: hidden;
       background: #000;
-      box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.7);
     }
+    .shell-ipad::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      right: 5px;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: #3f3f46;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .shell-tablet {
+      border: 11px solid #18181b;
+      border-radius: 20px;
+      box-shadow: 0 28px 70px -15px rgba(0, 0, 0, 0.88), 0 0 0 1px rgba(16, 185, 129, 0.25);
+      position: relative;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .shell-fullscreen {
+      border: none;
+      border-radius: 0px;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+
     #qrBox img, #qrBox canvas {
       margin: 0 auto;
       border-radius: 10px;
     }
+
     @keyframes pulseRing {
       0% { transform: scale(0.95); opacity: 0.7; }
       70% { transform: scale(1.15); opacity: 0; }
@@ -80,55 +118,106 @@
     .pulse-ring {
       animation: pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
+
+    @keyframes tapRipple {
+      0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.95; }
+      100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+    }
+    .remote-cursor-ripple {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 2px solid #34d399;
+      background: rgba(52, 211, 153, 0.25);
+      pointer-events: none;
+      z-index: 40;
+      animation: tapRipple 0.55s ease-out forwards;
+    }
+
+    /* Fullscreen Workspace Mode */
+    body.workspace-expanded header,
+    body.workspace-expanded footer,
+    body.workspace-expanded #leftSidebar {
+      display: none !important;
+    }
+    body.workspace-expanded main {
+      max-width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      height: 100vh !important;
+    }
+    body.workspace-expanded #viewReceiver {
+      display: block !important;
+      height: 100vh !important;
+    }
+    body.workspace-expanded #rightStageCol {
+      width: 100% !important;
+      height: 100vh !important;
+      gap: 0 !important;
+    }
+    body.workspace-expanded #stageContainer {
+      border-radius: 0 !important;
+      border: none !important;
+      height: calc(100vh - 48px) !important;
+      min-height: calc(100vh - 48px) !important;
+      padding: 0 !important;
+    }
+    body.workspace-expanded #stageToolbar {
+      border-radius: 0 !important;
+      border-left: none !important;
+      border-right: none !important;
+      border-top: none !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 selection:bg-emerald-500/30">
 
   <!-- Toast Container -->
-  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+  <div id="toastContainer" class="fixed bottom-14 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
   <!-- Top Navigation -->
-  <header class="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md">
+  <header class="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 min-w-0">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
           <svg class="w-5 h-5 text-zinc-950" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-            <rect x="7" y="2" width="10" height="20" rx="2.5" />
-            <path d="M12 18h.01" stroke-linecap="round" />
+            <rect x="2" y="4" width="20" height="14" rx="2.5" />
+            <path d="M8 21h8M12 18v3" stroke-linecap="round" />
           </svg>
         </div>
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white truncate">Phone on PC</h1>
-            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">P2P WebRTC</span>
+            <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white truncate">CastDesk</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">2-Way Desktop Cast</span>
           </div>
-          <p class="text-xs text-zinc-400 truncate hidden sm:block">Direct local Wi-Fi mirroring • Zero cloud video storage</p>
+          <p class="text-xs text-zinc-400 truncate hidden sm:block">iPadOS &amp; Android Tablet Mode • Full-Screen Two-Way Control</p>
         </div>
       </div>
 
       <!-- Mode Switcher -->
       <div class="flex items-center bg-zinc-900 p-1 rounded-xl border border-zinc-800 shrink-0">
         <button id="tabReceiver" type="button" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all bg-zinc-800 text-white shadow-sm">
-          PC Receiver
+          PC Desktop
         </button>
         <button id="tabSender" type="button" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-zinc-400 hover:text-white">
-          Phone Sender
+          Phone Cast
         </button>
         <button id="tabGuide" type="button" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-zinc-400 hover:text-white hidden sm:inline-flex">
-          Deploy Guide
+          Power &amp; Background
         </button>
       </div>
     </div>
   </header>
 
   <!-- Main Content -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5">
 
-    <!-- ==================== PC RECEIVER VIEW ==================== -->
-    <section id="viewReceiver" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- ==================== PC RECEIVER / DESKTOP WORKSPACE VIEW ==================== -->
+    <section id="viewReceiver" class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
       <!-- Left Column: Connection & Controls -->
-      <div class="lg:col-span-4 space-y-4">
+      <div id="leftSidebar" class="lg:col-span-4 space-y-4">
 
         <!-- Pairing Card -->
         <div class="glass-panel rounded-2xl p-5 space-y-4">
@@ -143,8 +232,8 @@
           </div>
 
           <!-- QR Code Display -->
-          <div class="bg-white p-3.5 rounded-2xl w-fit mx-auto shadow-inner">
-            <div id="qrBox" class="w-40 h-40 flex items-center justify-center text-zinc-900 text-xs font-mono">
+          <div class="bg-white p-3 rounded-2xl w-fit mx-auto shadow-inner">
+            <div id="qrBox" class="w-36 h-36 flex items-center justify-center text-zinc-900 text-xs font-mono">
               Generating QR...
             </div>
           </div>
@@ -156,156 +245,185 @@
               <div id="roomCodeDisplay" class="font-mono text-xl font-bold tracking-widest text-emerald-400">------</div>
             </div>
             <div class="flex items-center gap-1.5">
-              <button id="btnCopyCode" type="button" class="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 transition">
-                Copy Code
+              <button id="btnCopyCode" type="button" class="px-2.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 transition">
+                Code
               </button>
               <button id="btnCopyLink" type="button" class="px-3 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-xs font-medium text-emerald-400 border border-emerald-500/20 transition">
-                Copy Link
+                Share Link
               </button>
             </div>
           </div>
 
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Open this same website on your phone, tap <strong class="text-zinc-200">Phone Sender</strong>, and enter the 6-character code (or scan the QR code when hosted on Vercel).
-          </p>
+          <!-- Adaptive Layout Selector -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label for="layoutModeSelect" class="text-xs font-semibold text-zinc-300">PC Desktop Layout Mode</label>
+              <span id="detectedOsBadge" class="text-[11px] font-mono text-cyan-400">Auto-Detect</span>
+            </div>
+            <select id="layoutModeSelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500">
+              <option value="auto" selected>Auto-Adapt (iPhone → iPadOS | Android → Tablet)</option>
+              <option value="ipad">iPadOS Workstation (4:3 Desktop + Dock)</option>
+              <option value="tablet">Android DeX / Tablet Mode (16:10 + Taskbar)</option>
+              <option value="fullscreen">Edge-to-Edge Full Monitor Fill</option>
+              <option value="phone">Classic Phone Frame</option>
+            </select>
+          </div>
 
-          <!-- Demo Mode Button -->
-          <div class="pt-1 border-t border-zinc-800/80 flex items-center justify-between gap-2">
-            <button id="btnDemoStream" type="button" class="w-full py-2.5 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 text-xs font-medium text-zinc-200 transition flex items-center justify-center gap-2">
-              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-              <span>Test Interactive Demo Stream</span>
+          <!-- Demo Mode Buttons -->
+          <div class="pt-1 border-t border-zinc-800/80 grid grid-cols-2 gap-2">
+            <button id="btnDemoIpad" type="button" class="py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 text-xs font-medium text-zinc-200 transition flex items-center justify-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+              <span>iPadOS Demo</span>
+            </button>
+            <button id="btnDemoTablet" type="button" class="py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 text-xs font-medium text-zinc-200 transition flex items-center justify-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Tablet Demo</span>
             </button>
           </div>
         </div>
 
         <!-- Live Telemetry Card -->
-        <div class="glass-panel rounded-2xl p-5 space-y-3">
+        <div class="glass-panel rounded-2xl p-4 space-y-3">
           <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Stream Telemetry</h2>
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Live Link &amp; Telemetry</h2>
             <span id="streamTypeBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">IDLE</span>
           </div>
-          <div class="grid grid-cols-3 gap-2.5">
+          <div class="grid grid-cols-3 gap-2">
             <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-xl p-2.5">
               <div class="text-[11px] text-zinc-500">Resolution</div>
-              <div id="statRes" class="font-mono text-xs sm:text-sm font-semibold text-zinc-200 mt-0.5">--</div>
+              <div id="statRes" class="font-mono text-xs font-semibold text-zinc-200 mt-0.5">--</div>
             </div>
             <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-xl p-2.5">
               <div class="text-[11px] text-zinc-500">Frame Rate</div>
-              <div id="statFps" class="font-mono text-xs sm:text-sm font-semibold text-zinc-200 mt-0.5">--</div>
+              <div id="statFps" class="font-mono text-xs font-semibold text-zinc-200 mt-0.5">--</div>
             </div>
             <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-xl p-2.5">
-              <div class="text-[11px] text-zinc-500">Latency</div>
-              <div id="statRtt" class="font-mono text-xs sm:text-sm font-semibold text-zinc-200 mt-0.5">--</div>
+              <div class="text-[11px] text-zinc-500">2-Way Ping</div>
+              <div id="statRtt" class="font-mono text-xs font-semibold text-zinc-200 mt-0.5">--</div>
             </div>
           </div>
         </div>
 
         <!-- Quick Clipboard / Text Sync -->
-        <div class="glass-panel rounded-2xl p-5 space-y-3">
+        <div class="glass-panel rounded-2xl p-4 space-y-2.5">
           <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">P2P Clipboard Sync</h2>
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">2-Way Clipboard &amp; URL Push</h2>
             <span id="dataChannelStatus" class="text-[11px] text-zinc-500">Not paired</span>
           </div>
           <div class="flex gap-2">
-            <input id="pcClipInput" type="text" placeholder="Send URL or text to phone..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/60" />
+            <input id="pcClipInput" type="text" placeholder="Send text or URL to phone..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/60" />
             <button id="btnPcSendClip" type="button" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition shrink-0">
               Send
             </button>
           </div>
-          <div id="pcClipLog" class="space-y-1.5 max-h-28 overflow-y-auto text-xs text-zinc-400"></div>
+          <div id="pcClipLog" class="space-y-1.5 max-h-24 overflow-y-auto text-xs text-zinc-400"></div>
         </div>
 
       </div>
 
-      <!-- Right Column: Mirror Stage -->
-      <div class="lg:col-span-8 flex flex-col gap-4">
+      <!-- Right Column: Full-Screen Desktop Mirror Stage -->
+      <div id="rightStageCol" class="lg:col-span-8 flex flex-col gap-3">
 
         <!-- Stage Toolbar -->
-        <div class="glass-panel rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
+        <div id="stageToolbar" class="glass-panel rounded-2xl px-3 py-2 flex flex-wrap items-center justify-between gap-2">
           <div class="flex flex-wrap items-center gap-1.5">
-            <button id="btnRotate" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-              <span>Rotate (<span id="rotateLabel">0°</span>)</span>
+            <button id="btnExpandWorkspace" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+              <span id="expandLabel">Full Screen Mode</span>
             </button>
-            <button id="btnFlip" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
-              Flip H
+            <button id="btnTwoWayToggle" type="button" class="px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-xs font-semibold text-cyan-300 transition flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+              <span>2-Way Control: ON</span>
             </button>
-            <button id="btnBezel" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-emerald-400 transition">
-              Phone Frame: On
+            <button id="btnRotate" type="button" class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
+              Rotate (<span id="rotateLabel">0°</span>)
             </button>
-            <button id="btnFitMode" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
-              Fit: Contain
+            <button id="btnFitMode" type="button" class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
+              Fill Screen
             </button>
           </div>
 
           <div class="flex flex-wrap items-center gap-1.5">
-            <button id="btnScreenshot" type="button" disabled class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              <span>Screenshot</span>
+            <button id="btnScreenshot" type="button" disabled class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 transition">
+              PNG
             </button>
-            <button id="btnRecord" type="button" disabled class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5">
+            <button id="btnRecord" type="button" disabled class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 transition flex items-center gap-1.5">
               <span id="recDot" class="w-2 h-2 rounded-full bg-rose-500"></span>
-              <span id="recLabel">Record</span>
+              <span id="recLabel">Rec</span>
             </button>
-            <button id="btnMute" type="button" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
+            <button id="btnMute" type="button" class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 transition">
               Audio: On
             </button>
-            <button id="btnPiP" type="button" disabled class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-medium text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition">
-              PiP
-            </button>
-            <button id="btnFullscreen" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition">
-              Fullscreen
-            </button>
-            <button id="btnDisconnectReceiver" type="button" class="hidden px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-xs font-semibold text-white transition">
-              Stop
+            <button id="btnDisconnectReceiver" type="button" class="hidden px-2.5 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-xs font-semibold text-white transition">
+              End Cast
             </button>
           </div>
         </div>
 
         <!-- Video Stage -->
-        <div id="stageContainer" class="glass-panel rounded-2xl p-4 sm:p-8 min-h-[480px] sm:min-h-[580px] flex items-center justify-center relative overflow-hidden">
+        <div id="stageContainer" class="glass-panel rounded-2xl p-3 sm:p-5 min-h-[520px] sm:min-h-[640px] flex flex-col items-center justify-center relative overflow-hidden select-none">
+
           <!-- Idle Placeholder -->
-          <div id="stageIdle" class="text-center max-w-md space-y-4 py-8">
+          <div id="stageIdle" class="text-center max-w-lg space-y-4 py-8 px-4">
             <div class="relative w-20 h-20 mx-auto flex items-center justify-center">
               <div class="absolute inset-0 rounded-full bg-emerald-500/20 pulse-ring"></div>
               <div class="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
                 <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <rect x="7" y="2" width="10" height="20" rx="2.5" />
-                  <path d="M12 18h.01" stroke-linecap="round" />
+                  <rect x="2" y="4" width="20" height="14" rx="2.5" />
+                  <path d="M8 21h8M12 18v3" stroke-linecap="round" />
                 </svg>
               </div>
             </div>
             <div>
-              <h3 class="text-lg font-semibold text-white">Ready for Your Phone</h3>
-              <p class="text-sm text-zinc-400 mt-1">
-                Scan the QR code or enter the pairing code on your phone to start mirroring at up to 60 FPS over your local Wi-Fi.
+              <h3 class="text-xl font-bold text-white">Your Phone as a Full-Screen PC Workstation</h3>
+              <p class="text-sm text-zinc-400 mt-1.5 leading-relaxed">
+                Pair your phone to automatically transform <strong>iPhone into an iPadOS desktop</strong> or <strong>Android into a Tablet workspace</strong>. Click, swipe, type from your PC keyboard, or test the interactive demos on the left.
               </p>
             </div>
-            <div class="flex flex-wrap justify-center gap-2 text-xs text-zinc-400">
-              <span class="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">Encrypted WebRTC</span>
-              <span class="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">No Video Server</span>
-              <span class="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">PNG &amp; WebM Capture</span>
+            <div class="flex flex-wrap justify-center gap-2 text-xs text-zinc-300">
+              <span class="px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800">iPhone → iPadOS UI</span>
+              <span class="px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800">Android → Tablet UI</span>
+              <span class="px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800">2-Way Mouse &amp; Keyboard</span>
             </div>
           </div>
 
-          <!-- Active Video Wrapper -->
-          <div id="videoFrame" class="hidden phone-bezel transition-all duration-300 flex items-center justify-center max-h-[75vh]">
-            <video id="remoteVideo" autoplay playsinline class="max-h-[72vh] max-w-full object-contain transition-transform duration-300"></video>
+          <!-- Active Interactive Surface -->
+          <div id="videoFrame" class="hidden shell-tablet transition-all duration-300 flex flex-col items-center justify-center w-full h-full max-h-[82vh] relative cursor-crosshair">
+            <!-- Remote Stream / Demo Video -->
+            <video id="remoteVideo" autoplay playsinline class="w-full h-full object-contain transition-transform duration-300"></video>
+
+            <!-- Adaptive OS Desktop Overlay Bar (iPadOS Dock / Android Tablet Navigation) -->
+            <div id="osDesktopBar" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-zinc-950/85 backdrop-blur-xl border border-white/15 shadow-2xl">
+              <span id="osModePill" class="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Tablet Mode</span>
+              <div class="h-4 w-[1px] bg-zinc-700"></div>
+              <button type="button" data-nav="back" class="px-2.5 py-1 rounded-lg hover:bg-white/10 text-xs font-medium text-zinc-200 transition" title="Send Back Gesture">
+                ◀ Back
+              </button>
+              <button type="button" data-nav="home" class="px-2.5 py-1 rounded-lg hover:bg-white/10 text-xs font-medium text-zinc-200 transition" title="Send Home Gesture">
+                ● Home
+              </button>
+              <button type="button" data-nav="recents" class="px-2.5 py-1 rounded-lg hover:bg-white/10 text-xs font-medium text-zinc-200 transition" title="Send App Switcher">
+                ■ Apps
+              </button>
+              <div class="h-4 w-[1px] bg-zinc-700 hidden sm:block"></div>
+              <button id="btnFocusKeyboard" type="button" class="hidden sm:inline-flex px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-xs font-medium text-cyan-300 border border-cyan-500/25 transition">
+                ⌨ Type to Phone
+              </button>
+            </div>
           </div>
+
         </div>
 
       </div>
     </section>
 
-    <!-- ==================== PHONE SENDER VIEW ==================== -->
+    <!-- ==================== PHONE SENDER / CAST VIEW ==================== -->
     <section id="viewSender" class="hidden max-w-xl mx-auto space-y-5">
       <div class="glass-panel rounded-2xl p-6 space-y-5">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-lg font-bold text-white">Send Phone Screen to PC</h2>
-            <p class="text-xs text-zinc-400 mt-0.5">Enter the 6-character code shown on your PC screen.</p>
+            <h2 class="text-lg font-bold text-white">Cast Phone to PC Desktop</h2>
+            <p class="text-xs text-zinc-400 mt-0.5">Auto-detected: <strong id="phoneOsLabel" class="text-emerald-400">Mobile Device</strong></p>
           </div>
           <span id="senderBadge" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-900 text-zinc-400 border border-zinc-800">Standby</span>
         </div>
@@ -319,87 +437,88 @@
         <!-- Quality & Source Controls -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="space-y-1.5">
-            <label for="qualitySelect" class="block text-xs font-medium text-zinc-300">Stream Quality</label>
+            <label for="qualitySelect" class="block text-xs font-medium text-zinc-300">Desktop Cast Quality</label>
             <select id="qualitySelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500">
-              <option value="ultra">1080p • 60 FPS (Lowest Lag)</option>
-              <option value="balanced" selected>720p • 60 FPS (Recommended)</option>
-              <option value="battery">720p • 30 FPS (Battery Saver)</option>
+              <option value="ultra" selected>1080p • 60 FPS (Full Screen Sharpness)</option>
+              <option value="balanced">720p • 60 FPS (Low Latency)</option>
+              <option value="battery">720p • 30 FPS (Charging / Eco)</option>
             </select>
           </div>
           <div class="space-y-1.5">
             <label for="sourceSelect" class="block text-xs font-medium text-zinc-300">Capture Source</label>
             <select id="sourceSelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500">
               <option value="screen">Full Phone Screen (Android)</option>
-              <option value="camera_back">Rear Camera (Document/Desk)</option>
+              <option value="camera_back">Rear Camera (iOS / Desk Mode)</option>
               <option value="camera_front">Front Camera (Webcam Mode)</option>
             </select>
           </div>
         </div>
 
-        <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
-          <input id="chkAudio" type="checkbox" checked class="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-0" />
-          <span>Include device/microphone audio when supported</span>
-        </label>
+        <!-- Background & Charging Keep-Alive Controls -->
+        <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-200">Charging &amp; Low-Power Keep-Alive</span>
+            <span id="wakeLockStatus" class="text-[11px] font-mono text-emerald-400">Ready</span>
+          </div>
+          <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
+            <input id="chkWakeLock" type="checkbox" checked class="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-0" />
+            <span>Keep background session alive while charging on desk</span>
+          </label>
+          <button id="btnPocketDimmer" type="button" class="w-full py-2 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-cyan-300 transition">
+            Enable OLED Black Screen Saver (Save Battery While Casting)
+          </button>
+        </div>
 
         <!-- Action Buttons -->
         <div class="flex gap-3 pt-1">
           <button id="btnStartMirror" type="button" class="flex-1 py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-zinc-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition">
-            Start Screen Mirroring
+            Start Full-Screen Cast
           </button>
           <button id="btnStopMirror" type="button" class="hidden flex-1 py-3.5 px-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm transition">
-            Stop Mirroring
+            Stop Casting
           </button>
+        </div>
+
+        <!-- Remote Control Telemetry Feed on Phone -->
+        <div id="phoneRemoteFeed" class="hidden rounded-xl bg-zinc-900/90 border border-emerald-500/30 p-3 space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold text-emerald-400">2-Way PC Remote Input Active</span>
+            <span id="lastRemoteEvent" class="font-mono text-[11px] text-zinc-400">Listening...</span>
+          </div>
+          <p class="text-[11px] text-zinc-400">PC mouse clicks, navigation keys, and typed text appear instantly below and copy to your clipboard.</p>
+          <div id="phoneIncomingText" class="text-xs font-mono text-white bg-zinc-950 rounded-lg p-2 min-h-[32px] break-all"></div>
         </div>
 
         <!-- Local Preview -->
         <div id="senderPreviewWrap" class="hidden rounded-xl overflow-hidden border border-zinc-800 bg-black">
-          <video id="localPreview" autoplay muted playsinline class="w-full max-h-56 object-contain"></video>
+          <video id="localPreview" autoplay muted playsinline class="w-full max-h-48 object-contain"></video>
         </div>
-
-        <!-- Sender Clipboard -->
-        <div id="senderClipBox" class="hidden pt-3 border-t border-zinc-800 space-y-2">
-          <div class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Clipboard Sync</div>
-          <div class="flex gap-2">
-            <input id="phoneClipInput" type="text" placeholder="Send text to PC..." class="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500" />
-            <button id="btnPhoneSendClip" type="button" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition">
-              Send
-            </button>
-          </div>
-          <div id="phoneClipLog" class="space-y-1 text-xs text-zinc-400 max-h-24 overflow-y-auto"></div>
-        </div>
-      </div>
-
-      <!-- Platform Compatibility Note -->
-      <div class="glass-panel rounded-2xl p-4 text-xs text-zinc-400 space-y-1.5">
-        <div class="font-semibold text-zinc-200">Device Compatibility Note</div>
-        <p><strong class="text-emerald-400">Android (Chrome / Edge / Brave):</strong> Full screen mirroring works natively right inside the browser.</p>
-        <p><strong class="text-amber-400">iPhone / iPad (iOS Safari):</strong> Apple blocks browser screen capture (<code>getDisplayMedia</code>) on iOS. You can still use <em>Rear/Front Camera</em> mode here, or use AirPlay / USB cable for full iOS screen mirroring.</p>
       </div>
     </section>
 
-    <!-- ==================== SETUP & DEPLOY GUIDE VIEW ==================== -->
+    <!-- ==================== POWER, BACKGROUND & 2-WAY ARCHITECTURE GUIDE ==================== -->
     <section id="viewGuide" class="hidden max-w-4xl mx-auto space-y-5">
       <div class="glass-panel rounded-2xl p-6 space-y-5">
         <div>
-          <h2 class="text-xl font-bold text-white">Deploy Free on GitHub &amp; Vercel</h2>
-          <p class="text-sm text-zinc-400 mt-1">This app is 100% static HTML/JS with zero paid servers and zero malware.</p>
+          <h2 class="text-xl font-bold text-white">How Full-Screen 2-Way Control &amp; Charging Mode Work</h2>
+          <p class="text-sm text-zinc-400 mt-1">Built with 100% pure web standards so you can host it free on Vercel with zero malware or risky APK installs.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-2">
-            <div class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 font-bold text-sm flex items-center justify-center">1</div>
-            <h3 class="text-sm font-semibold text-white">Save as index.html</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Click <strong>Export</strong> or copy this single file, save it as <code>index.html</code>, and push it to a free GitHub repository.</p>
+            <div class="text-xs font-bold uppercase tracking-wider text-emerald-400">1. Adaptive Desktop Layouts</div>
+            <h3 class="text-sm font-semibold text-white">iPadOS &amp; Android Tablet UI</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">CastDesk automatically detects whether an iPhone or Android connects and switches your PC monitor into a full-screen iPadOS workstation or Android Tablet view with floating dock controls.</p>
           </div>
           <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-2">
-            <div class="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-400 font-bold text-sm flex items-center justify-center">2</div>
-            <h3 class="text-sm font-semibold text-white">Deploy on Vercel</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Log into Vercel.com with GitHub, click <strong>Add New Project</strong>, select your repo, and click <strong>Deploy</strong>. Free HTTPS URL in 30 seconds.</p>
+            <div class="text-xs font-bold uppercase tracking-wider text-cyan-400">2. Charging &amp; Screen Saver</div>
+            <h3 class="text-sm font-semibold text-white">OLED Black Dimmer + WakeLock</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Mobile OS security stops WebRTC video if the hardware power button locks the phone. Use CastDesk's <strong>OLED Black Screen Saver</strong> + WakeLock while charging so the screen draws near-zero power while streaming continuously.</p>
           </div>
           <div class="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-2">
-            <div class="w-7 h-7 rounded-lg bg-violet-500/15 text-violet-400 font-bold text-sm flex items-center justify-center">3</div>
-            <h3 class="text-sm font-semibold text-white">Zero-Lag Wi-Fi Tips</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Keep both Phone and PC on the same 5GHz Wi-Fi network. WebRTC routes video directly between devices on your LAN.</p>
+            <div class="text-xs font-bold uppercase tracking-wider text-amber-400">3. Two-Way PC Control</div>
+            <h3 class="text-sm font-semibold text-white">Low-Latency DataChannel</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Clicks, swipes, navigation buttons, and keyboard typing on your PC are transmitted in &lt;5ms over WebRTC DataChannels. (Note: Browsers sandbox OS-level taps outside Chrome unless paired with an ADB/Accessibility bridge.)</p>
           </div>
         </div>
       </div>
@@ -407,8 +526,21 @@
 
   </main>
 
-  <footer class="border-t border-zinc-900 py-4 text-center text-xs text-zinc-500">
-    Phone on PC • Open-standard WebRTC P2P • No account, no tracking, no video stored on any server.
+  <!-- OLED Black Screen Saver Overlay (For Phone While Charging) -->
+  <div id="oledDimmerOverlay" class="hidden fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 text-center select-none">
+    <div class="space-y-4 max-w-xs">
+      <div class="w-3 h-3 rounded-full bg-emerald-500 mx-auto animate-pulse"></div>
+      <div class="text-xs font-mono uppercase tracking-widest text-zinc-600">Casting Active • OLED Power Save</div>
+      <div id="dimmerClock" class="text-3xl font-mono font-bold text-zinc-700">12:00</div>
+      <p class="text-[11px] text-zinc-700">Keep Chrome open while charging. Double-tap anywhere to wake screen.</p>
+    </div>
+  </div>
+
+  <!-- Hidden Input for Direct PC-to-Phone Keyboard Typing -->
+  <input id="hiddenKeyboardBridge" type="text" class="sr-only" aria-hidden="true" />
+
+  <footer class="border-t border-zinc-900 py-3.5 text-center text-xs text-zinc-500">
+    CastDesk • Full-Screen Two-Way Phone-to-PC Workspace • 100% Static WebRTC P2P
   </footer>
 
   <script>
@@ -423,20 +555,23 @@
         remoteStream: null,
         localStream: null,
         demoInterval: null,
+        demoType: 'tablet',
         statsInterval: null,
         mediaRecorder: null,
         recordedChunks: [],
         isRecording: false,
         rotation: 0,
-        flipped: false,
-        showBezel: true,
-        fitContain: true,
-        isMuted: false
+        fitFill: false,
+        isMuted: false,
+        twoWayEnabled: true,
+        workspaceExpanded: false,
+        remoteDeviceOS: 'android', // 'ios' | 'android'
+        wakeLock: null,
+        silentAudioCtx: null
       };
 
-      const PEER_PREFIX = 'popc-v1-';
+      const PEER_PREFIX = 'castdesk-v2-';
 
-      // Detect if running inside a restricted sandboxed iframe where external WebSockets are blocked
       function isRestrictedSandbox() {
         try {
           if (window.location.protocol === 'about:' || window.location.protocol === 'blob:' || window.location.protocol === 'data:') {
@@ -451,7 +586,17 @@
         return false;
       }
 
-      // Cross-browser rounded rectangle helper for canvas rendering
+      function detectClientOS() {
+        const ua = navigator.userAgent || '';
+        if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+          return 'ios';
+        }
+        if (/Android/i.test(ua)) {
+          return 'android';
+        }
+        return 'desktop';
+      }
+
       function drawRoundedRect(ctx, x, y, width, height, radius) {
         if (typeof ctx.roundRect === 'function') {
           ctx.beginPath();
@@ -488,26 +633,31 @@
       const btnRegenerateId = el('btnRegenerateId');
       const btnCopyCode = el('btnCopyCode');
       const btnCopyLink = el('btnCopyLink');
-      const btnDemoStream = el('btnDemoStream');
+      const layoutModeSelect = el('layoutModeSelect');
+      const detectedOsBadge = el('detectedOsBadge');
+      const btnDemoIpad = el('btnDemoIpad');
+      const btnDemoTablet = el('btnDemoTablet');
 
       const stageIdle = el('stageIdle');
       const videoFrame = el('videoFrame');
       const remoteVideo = el('remoteVideo');
       const stageContainer = el('stageContainer');
+      const osModePill = el('osModePill');
 
+      const btnExpandWorkspace = el('btnExpandWorkspace');
+      const expandLabel = el('expandLabel');
+      const btnTwoWayToggle = el('btnTwoWayToggle');
       const btnRotate = el('btnRotate');
       const rotateLabel = el('rotateLabel');
-      const btnFlip = el('btnFlip');
-      const btnBezel = el('btnBezel');
       const btnFitMode = el('btnFitMode');
       const btnScreenshot = el('btnScreenshot');
       const btnRecord = el('btnRecord');
       const recDot = el('recDot');
       const recLabel = el('recLabel');
       const btnMute = el('btnMute');
-      const btnPiP = el('btnPiP');
-      const btnFullscreen = el('btnFullscreen');
       const btnDisconnectReceiver = el('btnDisconnectReceiver');
+      const btnFocusKeyboard = el('btnFocusKeyboard');
+      const hiddenKeyboardBridge = el('hiddenKeyboardBridge');
 
       const streamTypeBadge = el('streamTypeBadge');
       const statRes = el('statRes');
@@ -519,19 +669,23 @@
       const btnPcSendClip = el('btnPcSendClip');
       const pcClipLog = el('pcClipLog');
 
+      const phoneOsLabel = el('phoneOsLabel');
       const targetCodeInput = el('targetCodeInput');
       const qualitySelect = el('qualitySelect');
       const sourceSelect = el('sourceSelect');
-      const chkAudio = el('chkAudio');
+      const chkWakeLock = el('chkWakeLock');
+      const wakeLockStatus = el('wakeLockStatus');
+      const btnPocketDimmer = el('btnPocketDimmer');
+      const oledDimmerOverlay = el('oledDimmerOverlay');
+      const dimmerClock = el('dimmerClock');
       const btnStartMirror = el('btnStartMirror');
       const btnStopMirror = el('btnStopMirror');
       const senderBadge = el('senderBadge');
       const senderPreviewWrap = el('senderPreviewWrap');
       const localPreview = el('localPreview');
-      const senderClipBox = el('senderClipBox');
-      const phoneClipInput = el('phoneClipInput');
-      const btnPhoneSendClip = el('btnPhoneSendClip');
-      const phoneClipLog = el('phoneClipLog');
+      const phoneRemoteFeed = el('phoneRemoteFeed');
+      const lastRemoteEvent = el('lastRemoteEvent');
+      const phoneIncomingText = el('phoneIncomingText');
 
       // ==================== UTILITIES ====================
       function showToast(msg, type = 'info') {
@@ -542,14 +696,14 @@
           warn: 'border-amber-500/40 bg-amber-950/90 text-amber-200'
         };
         const toast = document.createElement('div');
-        toast.className = `pointer-events-auto px-4 py-3 rounded-xl border text-xs font-medium shadow-xl backdrop-blur-md transition-all ${colors[type] || colors.info}`;
+        toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl border text-xs font-medium shadow-xl backdrop-blur-md transition-all ${colors[type] || colors.info}`;
         toast.textContent = msg;
         el('toastContainer').appendChild(toast);
         setTimeout(() => {
           toast.style.opacity = '0';
           toast.style.transform = 'translateY(6px)';
           setTimeout(() => toast.remove(), 250);
-        }, 3200);
+        }, 3000);
       }
 
       function copyText(text, label) {
@@ -608,8 +762,8 @@
         try {
           new QRCode(qrBox, {
             text: getShareUrl(),
-            width: 152,
-            height: 152,
+            width: 138,
+            height: 138,
             colorDark: '#09090b',
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.M
@@ -629,6 +783,122 @@
         statusDot.className = `w-2.5 h-2.5 rounded-full ${dotMap[color] || 'bg-zinc-400'}`;
         statusText.textContent = label;
       }
+
+      // ==================== ADAPTIVE OS SHELL (iPadOS / Android Tablet) ====================
+      function applyDesktopShell() {
+        const selected = layoutModeSelect.value;
+        let effective = selected;
+        if (selected === 'auto') {
+          effective = state.remoteDeviceOS === 'ios' ? 'ipad' : 'tablet';
+        }
+
+        videoFrame.classList.remove('shell-phone', 'shell-ipad', 'shell-tablet', 'shell-fullscreen');
+
+        if (effective === 'ipad') {
+          videoFrame.classList.add('shell-ipad');
+          osModePill.textContent = 'iPadOS Desktop';
+          osModePill.className = 'text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+          detectedOsBadge.textContent = 'iPhone → iPadOS';
+        } else if (effective === 'tablet') {
+          videoFrame.classList.add('shell-tablet');
+          osModePill.textContent = 'Android Tablet';
+          osModePill.className = 'text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+          detectedOsBadge.textContent = 'Android → Tablet';
+        } else if (effective === 'fullscreen') {
+          videoFrame.classList.add('shell-fullscreen');
+          osModePill.textContent = 'Full Monitor';
+          detectedOsBadge.textContent = 'Edge-to-Edge';
+        } else {
+          videoFrame.classList.add('shell-phone');
+          osModePill.textContent = 'Phone Frame';
+          detectedOsBadge.textContent = 'Classic Frame';
+        }
+
+        remoteVideo.style.transform = `rotate(${state.rotation}deg)`;
+        remoteVideo.style.objectFit = state.fitFill ? 'cover' : 'contain';
+        rotateLabel.textContent = `${state.rotation}°`;
+      }
+
+      layoutModeSelect.addEventListener('change', applyDesktopShell);
+
+      // ==================== FULL-SCREEN WORKSPACE EXPANSION ====================
+      function toggleWorkspaceExpand() {
+        state.workspaceExpanded = !state.workspaceExpanded;
+        document.body.classList.toggle('workspace-expanded', state.workspaceExpanded);
+        expandLabel.textContent = state.workspaceExpanded ? 'Exit Full Screen' : 'Full Screen Mode';
+
+        if (state.workspaceExpanded && document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else if (!state.workspaceExpanded && document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+
+      btnExpandWorkspace.addEventListener('click', toggleWorkspaceExpand);
+
+      // ==================== TWO-WAY REMOTE INPUT (PC -> PHONE) ====================
+      function sendRemoteControl(payload) {
+        if (!state.twoWayEnabled) return;
+        if (state.dataConn && state.dataConn.open) {
+          state.dataConn.send({ type: 'remote_input', ...payload });
+        }
+      }
+
+      function spawnCursorRipple(clientX, clientY) {
+        const rect = videoFrame.getBoundingClientRect();
+        const ripple = document.createElement('div');
+        ripple.className = 'remote-cursor-ripple';
+        ripple.style.left = `${clientX - rect.left}px`;
+        ripple.style.top = `${clientY - rect.top}px`;
+        videoFrame.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 550);
+      }
+
+      remoteVideo.addEventListener('pointerdown', (e) => {
+        if (!state.twoWayEnabled) return;
+        const rect = remoteVideo.getBoundingClientRect();
+        const nx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const ny = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        spawnCursorRipple(e.clientX, e.clientY);
+        sendRemoteControl({ action: 'tap', x: Number(nx.toFixed(4)), y: Number(ny.toFixed(4)) });
+      });
+
+      document.querySelectorAll('[data-nav]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const nav = btn.getAttribute('data-nav');
+          sendRemoteControl({ action: 'nav', key: nav });
+          showToast(`Sent ${nav.toUpperCase()} command to device`, 'info');
+        });
+      });
+
+      btnFocusKeyboard.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hiddenKeyboardBridge.focus();
+        showToast('PC Keyboard linked — type to send text to phone', 'success');
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (!state.twoWayEnabled || state.mode !== 'receiver') return;
+        if (document.activeElement === pcClipInput || document.activeElement === targetCodeInput) return;
+
+        if (e.key === 'Escape' && state.workspaceExpanded) {
+          toggleWorkspaceExpand();
+          return;
+        }
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+          sendRemoteControl({ action: 'key', char: e.key });
+        } else if (e.key === 'Backspace' || e.key === 'Enter') {
+          sendRemoteControl({ action: 'key', special: e.key });
+        }
+      });
+
+      btnTwoWayToggle.addEventListener('click', () => {
+        state.twoWayEnabled = !state.twoWayEnabled;
+        btnTwoWayToggle.innerHTML = state.twoWayEnabled
+          ? '<span class="w-2 h-2 rounded-full bg-cyan-400"></span><span>2-Way Control: ON</span>'
+          : '<span class="w-2 h-2 rounded-full bg-zinc-500"></span><span>2-Way Control: OFF</span>';
+      });
 
       // ==================== TAB SWITCHING ====================
       function switchTab(mode) {
@@ -660,7 +930,7 @@
         renderQr();
 
         if (typeof Peer === 'undefined' || isRestrictedSandbox()) {
-          setReceiverStatus('Preview Mode (Deploy to Vercel for P2P)', 'amber');
+          setReceiverStatus('Preview Mode (Deploy on Vercel for Live P2P)', 'amber');
           return;
         }
 
@@ -677,25 +947,34 @@
             }
           });
         } catch (err) {
-          setReceiverStatus('Preview Mode (Deploy to Vercel for P2P)', 'amber');
+          setReceiverStatus('Preview Mode (Deploy on Vercel for Live P2P)', 'amber');
           return;
         }
         state.peer = peer;
 
         peer.on('open', () => {
-          setReceiverStatus('Waiting for phone...', 'emerald');
+          setReceiverStatus('Ready — Waiting for Phone', 'emerald');
         });
 
         peer.on('connection', (conn) => {
           state.dataConn = conn;
-          dataChannelStatus.textContent = 'Paired';
-          dataChannelStatus.className = 'text-[11px] text-emerald-400 font-medium';
+          dataChannelStatus.textContent = '2-Way Paired';
+          dataChannelStatus.className = 'text-[11px] text-emerald-400 font-semibold';
+
           conn.on('data', (data) => {
-            if (data && data.type === 'clip') {
+            if (!data) return;
+            if (data.type === 'device_meta') {
+              state.remoteDeviceOS = data.os === 'ios' ? 'ios' : 'android';
+              applyDesktopShell();
+              showToast(`Connected ${state.remoteDeviceOS === 'ios' ? 'iPhone (iPadOS Mode)' : 'Android (Tablet Mode)'}`, 'success');
+            } else if (data.type === 'clip') {
               appendClipLog(pcClipLog, 'Phone', data.text);
-              showToast('Received text from phone', 'info');
+              showToast('Clipboard synced from phone', 'info');
+            } else if (data.type === 'heartbeat') {
+              conn.send({ type: 'heartbeat_ack', ts: data.ts });
             }
           });
+
           conn.on('close', () => {
             dataChannelStatus.textContent = 'Disconnected';
             dataChannelStatus.className = 'text-[11px] text-zinc-500';
@@ -705,12 +984,11 @@
         peer.on('call', (call) => {
           stopDemoStream(true);
           state.activeCall = call;
-          setReceiverStatus('Incoming phone stream...', 'cyan');
+          setReceiverStatus('Incoming Desktop Cast...', 'cyan');
           call.answer();
           call.on('stream', (stream) => {
-            attachReceiverStream(stream, 'LIVE P2P');
-            setReceiverStatus('Mirroring Live (P2P)', 'emerald');
-            showToast('Phone connected!', 'success');
+            attachReceiverStream(stream, 'LIVE 2-WAY');
+            setReceiverStatus('Casting Live • 2-Way Active', 'emerald');
             startRtcStatsLoop(call.peerConnection);
           });
           call.on('close', () => {
@@ -719,7 +997,7 @@
           });
           call.on('error', () => {
             clearReceiverStream();
-            setReceiverStatus('Stream error', 'rose');
+            setReceiverStatus('Stream interrupted', 'rose');
           });
         });
 
@@ -727,7 +1005,7 @@
           if (err && err.type === 'unavailable-id') {
             initReceiverPeer();
           } else {
-            setReceiverStatus('Signaling limited (use Demo or reload)', 'amber');
+            setReceiverStatus('Signaling limited (Use Demo or Deploy)', 'amber');
           }
         });
       }
@@ -740,11 +1018,10 @@
         videoFrame.classList.remove('hidden');
         btnScreenshot.disabled = false;
         btnRecord.disabled = false;
-        btnPiP.disabled = false;
         btnDisconnectReceiver.classList.remove('hidden');
         streamTypeBadge.textContent = badgeText;
         streamTypeBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
-        updateVideoTransform();
+        applyDesktopShell();
       }
 
       function clearReceiverStream() {
@@ -759,7 +1036,6 @@
         stageIdle.classList.remove('hidden');
         btnScreenshot.disabled = true;
         btnRecord.disabled = true;
-        btnPiP.disabled = true;
         btnDisconnectReceiver.classList.add('hidden');
         streamTypeBadge.textContent = 'IDLE';
         streamTypeBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800';
@@ -778,10 +1054,8 @@
           try {
             const stats = await pc.getStats();
             stats.forEach((report) => {
-              if (report.type === 'inbound-rtp' && report.kind === 'video') {
-                if (report.framesPerSecond) {
-                  statFps.textContent = `${Math.round(report.framesPerSecond)} fps`;
-                }
+              if (report.type === 'inbound-rtp' && report.kind === 'video' && report.framesPerSecond) {
+                statFps.textContent = `${Math.round(report.framesPerSecond)} fps`;
               }
               if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.currentRoundTripTime != null) {
                 statRtt.textContent = `${Math.round(report.currentRoundTripTime * 1000)} ms`;
@@ -791,139 +1065,136 @@
         }, 1000);
       }
 
-      // ==================== DEMO STREAM (CANVAS 60FPS) ====================
-      function startDemoStream() {
-        if (state.demoInterval) {
+      // ==================== INTERACTIVE DEMO STREAMS (iPadOS & Android Tablet) ====================
+      function startDemoStream(type) {
+        if (state.demoInterval && state.demoType === type) {
           stopDemoStream(false);
           return;
         }
-        if (state.activeCall) {
-          try { state.activeCall.close(); } catch (e) {}
-          state.activeCall = null;
-        }
+        stopDemoStream(true);
+        state.demoType = type;
+        state.remoteDeviceOS = type === 'ipad' ? 'ios' : 'android';
+
+        const isIpad = type === 'ipad';
         const canvas = document.createElement('canvas');
-        canvas.width = 540;
-        canvas.height = 1140;
+        canvas.width = isIpad ? 1280 : 1366;
+        canvas.height = isIpad ? 960 : 854;
         const ctx = canvas.getContext('2d');
         let frame = 0;
 
         function drawFrame() {
           frame++;
-          const grad = ctx.createLinearGradient(0, 0, 540, 1140);
-          grad.addColorStop(0, '#09090b');
-          grad.addColorStop(0.5, '#064e3b');
-          grad.addColorStop(1, '#083344');
+          const w = canvas.width;
+          const h = canvas.height;
+
+          // Wallpaper Gradient
+          const grad = ctx.createLinearGradient(0, 0, w, h);
+          if (isIpad) {
+            grad.addColorStop(0, '#0f172a');
+            grad.addColorStop(0.5, '#1e1b4b');
+            grad.addColorStop(1, '#083344');
+          } else {
+            grad.addColorStop(0, '#09090b');
+            grad.addColorStop(0.5, '#064e3b');
+            grad.addColorStop(1, '#042f2e');
+          }
           ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, 540, 1140);
+          ctx.fillRect(0, 0, w, h);
 
-          // Status bar
-          ctx.fillStyle = '#e4e4e7';
-          ctx.font = '600 22px Inter, sans-serif';
+          // Top Status Bar
+          ctx.fillStyle = 'rgba(9, 9, 11, 0.55)';
+          ctx.fillRect(0, 0, w, 38);
+          ctx.fillStyle = '#f4f4f5';
+          ctx.font = '600 16px Inter, sans-serif';
+          ctx.textAlign = 'left';
           const now = new Date();
-          ctx.fillText(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 36, 54);
-          ctx.fillText('5G  100%', 400, 54);
+          ctx.fillText(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 24, 25);
+          ctx.textAlign = 'right';
+          ctx.fillText(isIpad ? 'iPadOS Stage Manager • Wi-Fi 6E • 100%' : 'Android DeX Tablet Workspace • 5G • 100%', w - 24, 25);
 
-          // Animated Pulse Circle
-          const r = 75 + Math.sin(frame * 0.08) * 14;
-          ctx.beginPath();
-          ctx.arc(270, 360, r, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+          // Split-Screen Multi-Window Simulation
+          ctx.textAlign = 'left';
+          const pulse = Math.sin(frame * 0.05) * 4;
+
+          // Left Window
+          ctx.fillStyle = 'rgba(24, 24, 27, 0.88)';
+          drawRoundedRect(ctx, 36, 68 + pulse, w * 0.56, h - 170, 22);
           ctx.fill();
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = '#34d399';
+          ctx.strokeStyle = isIpad ? 'rgba(56, 189, 248, 0.35)' : 'rgba(52, 211, 153, 0.35)';
+          ctx.lineWidth = 2;
           ctx.stroke();
 
           ctx.fillStyle = '#ffffff';
-          ctx.font = '700 34px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('Phone on PC', 270, 355);
-          ctx.fillStyle = '#a7f3d0';
-          ctx.font = '500 20px JetBrains Mono, monospace';
-          ctx.fillText('60 FPS DEMO FEED', 270, 392);
+          ctx.font = '700 28px Inter, sans-serif';
+          ctx.fillText(isIpad ? 'iPhone → iPadOS Desktop Mode' : 'Android → Tablet Desktop Mode', 66, 122 + pulse);
+          ctx.fillStyle = '#a1a1aa';
+          ctx.font = '400 18px Inter, sans-serif';
+          ctx.fillText('Click anywhere on this screen to test 2-Way cursor ripples.', 66, 158 + pulse);
 
-          // Simulated App Cards
-          ctx.textAlign = 'left';
-          const cards = [
-            { title: 'Ultra-Low Latency', sub: 'Direct WebRTC Peer-to-Peer', y: 520 },
-            { title: 'Screenshot & Record', sub: 'Try the toolbar buttons above', y: 660 },
-            { title: 'Rotate, Flip & PiP', sub: 'Works in Fullscreen too', y: 800 }
-          ];
-          cards.forEach((c, idx) => {
-            const offset = Math.sin(frame * 0.04 + idx) * 6;
-            ctx.fillStyle = 'rgba(24, 24, 27, 0.82)';
-            drawRoundedRect(ctx, 42, c.y + offset, 456, 110, 22);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+          // Live Waveform inside Left Window
+          ctx.beginPath();
+          for (let x = 66; x < w * 0.56; x += 8) {
+            const y = 340 + Math.sin(x * 0.025 + frame * 0.1) * 45;
+            if (x === 66) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = isIpad ? '#38bdf8' : '#34d399';
+          ctx.lineWidth = 3.5;
+          ctx.stroke();
 
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '600 24px Inter, sans-serif';
-            ctx.fillText(c.title, 70, c.y + offset + 46);
-            ctx.fillStyle = '#a1a1aa';
-            ctx.font = '400 19px Inter, sans-serif';
-            ctx.fillText(c.sub, 70, c.y + offset + 80);
-          });
-
-          // Home bar
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          drawRoundedRect(ctx, 185, 1105, 170, 8, 4);
+          // Right Slide-Over Window
+          const rx = w * 0.56 + 62;
+          const rw = w - rx - 36;
+          ctx.fillStyle = 'rgba(24, 24, 27, 0.88)';
+          drawRoundedRect(ctx, rx, 68 - pulse, rw, h - 170, 22);
           ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '600 22px Inter, sans-serif';
+          ctx.fillText('2-Way Controls', rx + 26, 120 - pulse);
+          ctx.fillStyle = '#a1a1aa';
+          ctx.font = '400 16px Inter, sans-serif';
+          ctx.fillText('• Full-Screen PC Monitor', rx + 26, 165 - pulse);
+          ctx.fillText('• Charging OLED Dimmer', rx + 26, 200 - pulse);
+          ctx.fillText('• Instant PNG / WebM Capture', rx + 26, 235 - pulse);
+          ctx.fillText('• Live Clipboard Sync', rx + 26, 270 - pulse);
         }
 
         drawFrame();
         state.demoInterval = setInterval(drawFrame, 1000 / 60);
         const stream = canvas.captureStream(60);
-        attachReceiverStream(stream, 'DEMO 60FPS');
-        statRes.textContent = '540×1140';
+        attachReceiverStream(stream, isIpad ? 'IPADOS DEMO' : 'TABLET DEMO');
+        statRes.textContent = `${canvas.width}×${canvas.height}`;
         statFps.textContent = '60 fps';
-        statRtt.textContent = '0 ms';
-        setReceiverStatus('Demo Stream Active', 'cyan');
-        btnDemoStream.querySelector('span').textContent = 'Stop Demo Stream';
+        statRtt.textContent = '1 ms';
+        setReceiverStatus(`${isIpad ? 'iPadOS' : 'Android Tablet'} Demo Active`, 'cyan');
       }
 
       function stopDemoStream(silent) {
         if (!state.demoInterval) return;
         clearInterval(state.demoInterval);
         state.demoInterval = null;
-        btnDemoStream.querySelector('span').textContent = 'Test Interactive Demo Stream';
         if (!silent) {
           clearReceiverStream();
-          setReceiverStatus('Waiting for phone...', 'emerald');
+          setReceiverStatus('Ready — Waiting for Phone', 'emerald');
         }
       }
 
-      // ==================== STAGE CONTROLS ====================
-      function updateVideoTransform() {
-        const scaleX = state.flipped ? -1 : 1;
-        remoteVideo.style.transform = `rotate(${state.rotation}deg) scaleX(${scaleX})`;
-        remoteVideo.style.objectFit = state.fitContain ? 'contain' : 'cover';
-        rotateLabel.textContent = `${state.rotation}°`;
-        videoFrame.className = `transition-all duration-300 flex items-center justify-center max-h-[75vh] ${state.showBezel ? 'phone-bezel' : 'borderless-frame'}`;
-      }
+      btnDemoIpad.addEventListener('click', () => startDemoStream('ipad'));
+      btnDemoTablet.addEventListener('click', () => startDemoStream('tablet'));
 
+      // ==================== STAGE TOOLBAR ACTIONS ====================
       btnRotate.addEventListener('click', () => {
         state.rotation = (state.rotation + 90) % 360;
-        updateVideoTransform();
-      });
-
-      btnFlip.addEventListener('click', () => {
-        state.flipped = !state.flipped;
-        btnFlip.classList.toggle('text-emerald-400', state.flipped);
-        updateVideoTransform();
-      });
-
-      btnBezel.addEventListener('click', () => {
-        state.showBezel = !state.showBezel;
-        btnBezel.textContent = `Phone Frame: ${state.showBezel ? 'On' : 'Off'}`;
-        btnBezel.classList.toggle('text-emerald-400', state.showBezel);
-        updateVideoTransform();
+        applyDesktopShell();
       });
 
       btnFitMode.addEventListener('click', () => {
-        state.fitContain = !state.fitContain;
-        btnFitMode.textContent = `Fit: ${state.fitContain ? 'Contain' : 'Cover'}`;
-        updateVideoTransform();
+        state.fitFill = !state.fitFill;
+        btnFitMode.textContent = state.fitFill ? 'Contain Fit' : 'Fill Screen';
+        applyDesktopShell();
       });
 
       btnMute.addEventListener('click', () => {
@@ -941,16 +1212,16 @@
         ctx.drawImage(remoteVideo, 0, 0, c.width, c.height);
         const a = document.createElement('a');
         a.href = c.toDataURL('image/png');
-        a.download = `phone-mirror-${Date.now()}.png`;
+        a.download = `castdesk-${Date.now()}.png`;
         a.click();
-        showToast('Screenshot saved as PNG!', 'success');
+        showToast('Desktop screenshot saved (PNG)!', 'success');
       });
 
       function toggleRecording() {
         if (!state.remoteStream) return;
         if (!state.isRecording) {
           if (typeof MediaRecorder === 'undefined') {
-            showToast('Screen recording is not supported in this browser.', 'error');
+            showToast('Recording not supported in this browser.', 'error');
             return;
           }
           try {
@@ -968,53 +1239,29 @@
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `phone-recording-${Date.now()}.${ext}`;
+              a.download = `castdesk-rec-${Date.now()}.${ext}`;
               a.click();
               setTimeout(() => URL.revokeObjectURL(url), 5000);
-              showToast(`Recording downloaded (.${ext})!`, 'success');
+              showToast(`Recording saved (.${ext})!`, 'success');
             };
             rec.start(250);
             state.mediaRecorder = rec;
             state.isRecording = true;
-            recLabel.textContent = 'Stop Rec';
+            recLabel.textContent = 'Stop';
             recDot.classList.add('animate-ping');
-            showToast('Recording started', 'info');
+            showToast('Recording desktop cast...', 'info');
           } catch (e) {
-            showToast('Recording not supported for this stream.', 'error');
+            showToast('Unable to record this stream.', 'error');
           }
         } else {
           try { state.mediaRecorder.stop(); } catch (e) {}
           state.isRecording = false;
-          recLabel.textContent = 'Record';
+          recLabel.textContent = 'Rec';
           recDot.classList.remove('animate-ping');
         }
       }
 
       btnRecord.addEventListener('click', toggleRecording);
-
-      btnPiP.addEventListener('click', async () => {
-        try {
-          if (document.pictureInPictureElement) {
-            await document.exitPictureInPicture();
-          } else if (remoteVideo.requestPictureInPicture) {
-            await remoteVideo.requestPictureInPicture();
-          } else {
-            showToast('Picture-in-Picture is not supported here.', 'warn');
-          }
-        } catch (e) {
-          showToast('Start a stream first to use PiP.', 'warn');
-        }
-      });
-
-      btnFullscreen.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          if (stageContainer.requestFullscreen) {
-            stageContainer.requestFullscreen().catch(() => showToast('Fullscreen blocked by browser.', 'warn'));
-          }
-        } else {
-          document.exitFullscreen();
-        }
-      });
 
       btnDisconnectReceiver.addEventListener('click', () => {
         stopDemoStream(true);
@@ -1023,13 +1270,12 @@
           state.activeCall = null;
         }
         clearReceiverStream();
-        setReceiverStatus('Waiting for phone...', 'emerald');
+        setReceiverStatus('Ready — Waiting for Phone', 'emerald');
       });
 
       btnRegenerateId.addEventListener('click', initReceiverPeer);
       btnCopyCode.addEventListener('click', () => copyText(state.roomCode, 'Pairing code'));
-      btnCopyLink.addEventListener('click', () => copyText(getShareUrl(), 'Pairing link'));
-      btnDemoStream.addEventListener('click', startDemoStream);
+      btnCopyLink.addEventListener('click', () => copyText(getShareUrl(), 'Share link'));
 
       // ==================== CLIPBOARD SYNC ====================
       function appendClipLog(container, who, text) {
@@ -1055,16 +1301,68 @@
           state.dataConn.send({ type: 'clip', text: val });
           appendClipLog(pcClipLog, 'PC', val);
           pcClipInput.value = '';
+          showToast('Sent to phone!', 'success');
         } else {
-          showToast('Connect a phone first to sync clipboard.', 'warn');
+          showToast('Pair a phone first to push text/URLs.', 'warn');
         }
       });
 
-      // ==================== PHONE SENDER ====================
+      // ==================== PHONE SENDER + CHARGING KEEP-ALIVE ====================
+      async function enableKeepAlive() {
+        if (!chkWakeLock.checked) return;
+        try {
+          if ('wakeLock' in navigator) {
+            state.wakeLock = await navigator.wakeLock.request('screen');
+            wakeLockStatus.textContent = 'WakeLock Active';
+          }
+        } catch (e) {
+          wakeLockStatus.textContent = 'Audio Keep-Alive';
+        }
+        // Silent WebAudio oscillator prevents mobile Chrome from suspending background tabs while casting
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx && !state.silentAudioCtx) {
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0.00001;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            state.silentAudioCtx = ctx;
+          }
+        } catch (e) {}
+      }
+
+      function disableKeepAlive() {
+        if (state.wakeLock) {
+          try { state.wakeLock.release(); } catch (e) {}
+          state.wakeLock = null;
+        }
+        if (state.silentAudioCtx) {
+          try { state.silentAudioCtx.close(); } catch (e) {}
+          state.silentAudioCtx = null;
+        }
+        wakeLockStatus.textContent = 'Standby';
+      }
+
+      btnPocketDimmer.addEventListener('click', () => {
+        oledDimmerOverlay.classList.remove('hidden');
+        dimmerClock.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      });
+
+      let lastDimTap = 0;
+      oledDimmerOverlay.addEventListener('click', () => {
+        const now = Date.now();
+        if (now - lastDimTap < 400) {
+          oledDimmerOverlay.classList.add('hidden');
+        }
+        lastDimTap = now;
+      });
+
       async function getSenderStream() {
         const q = qualitySelect.value;
         const src = sourceSelect.value;
-        const wantAudio = chkAudio.checked;
 
         const constraintsMap = {
           ultra: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60, max: 60 } },
@@ -1074,12 +1372,12 @@
 
         if (src === 'screen') {
           if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            throw new Error('Screen capture is not supported in this mobile browser. Try Android Chrome or switch Capture Source to Camera.');
+            throw new Error('iOS Safari blocks browser screen capture. Switch Capture Source to Rear/Front Camera, or use Android Chrome for full screen cast.');
           }
           try {
             return await navigator.mediaDevices.getDisplayMedia({
               video: constraintsMap[q],
-              audio: wantAudio
+              audio: true
             });
           } catch (err) {
             return await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
@@ -1088,7 +1386,7 @@
           const facing = src === 'camera_back' ? 'environment' : 'user';
           return await navigator.mediaDevices.getUserMedia({
             video: { ...constraintsMap[q], facingMode: facing },
-            audio: wantAudio
+            audio: true
           });
         }
       }
@@ -1100,11 +1398,11 @@
           return;
         }
         if (typeof Peer === 'undefined') {
-          showToast('P2P library failed to load. Check internet connection.', 'error');
+          showToast('P2P library unavailable. Check internet connection.', 'error');
           return;
         }
         if (isRestrictedSandbox()) {
-          showToast('External WebSockets are blocked in sandbox preview. Deploy on Vercel to pair devices!', 'warn');
+          showToast('Deploy to Vercel/HTTPS to establish live WebRTC P2P connections.', 'warn');
           return;
         }
 
@@ -1114,6 +1412,7 @@
           state.localStream = stream;
           localPreview.srcObject = stream;
           senderPreviewWrap.classList.remove('hidden');
+          await enableKeepAlive();
 
           stream.getVideoTracks()[0].addEventListener('ended', stopSenderMirror);
 
@@ -1131,26 +1430,41 @@
           senderPeer.on('open', () => {
             senderBadge.textContent = 'Connecting to PC...';
             const targetId = PEER_PREFIX + code;
+            const clientOS = detectClientOS();
 
             const conn = senderPeer.connect(targetId);
             state.dataConn = conn;
             conn.on('open', () => {
-              senderClipBox.classList.remove('hidden');
+              conn.send({ type: 'device_meta', os: clientOS });
+              phoneRemoteFeed.classList.remove('hidden');
             });
+
             conn.on('data', (data) => {
-              if (data && data.type === 'clip') {
-                appendClipLog(phoneClipLog, 'PC', data.text);
-                showToast('Received text from PC', 'info');
+              if (!data) return;
+              if (data.type === 'remote_input') {
+                if (data.action === 'tap') {
+                  lastRemoteEvent.textContent = `PC Tap (${Math.round(data.x * 100)}%, ${Math.round(data.y * 100)}%)`;
+                } else if (data.action === 'nav') {
+                  lastRemoteEvent.textContent = `PC Nav: ${data.key.toUpperCase()}`;
+                } else if (data.action === 'key') {
+                  if (data.char) phoneIncomingText.textContent += data.char;
+                  else if (data.special === 'Backspace') phoneIncomingText.textContent = phoneIncomingText.textContent.slice(0, -1);
+                  else if (data.special === 'Enter') phoneIncomingText.textContent += '\n';
+                  lastRemoteEvent.textContent = 'PC Keyboard Typing';
+                }
+              } else if (data.type === 'clip') {
+                phoneIncomingText.textContent = data.text;
+                copyText(data.text, 'PC Clipboard');
               }
             });
 
             const call = senderPeer.call(targetId, stream);
             state.activeCall = call;
-            senderBadge.textContent = 'Mirroring Live';
+            senderBadge.textContent = 'Casting Live';
             senderBadge.className = 'px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
             btnStartMirror.classList.add('hidden');
             btnStopMirror.classList.remove('hidden');
-            showToast('Streaming to PC!', 'success');
+            showToast('Full-screen cast started!', 'success');
           });
 
           senderPeer.on('error', (err) => {
@@ -1164,6 +1478,8 @@
       });
 
       function stopSenderMirror() {
+        disableKeepAlive();
+        oledDimmerOverlay.classList.add('hidden');
         if (state.localStream) {
           state.localStream.getTracks().forEach((t) => t.stop());
           state.localStream = null;
@@ -1178,7 +1494,7 @@
         }
         localPreview.srcObject = null;
         senderPreviewWrap.classList.add('hidden');
-        senderClipBox.classList.add('hidden');
+        phoneRemoteFeed.classList.add('hidden');
         btnStartMirror.classList.remove('hidden');
         btnStopMirror.classList.add('hidden');
         senderBadge.textContent = 'Standby';
@@ -1187,20 +1503,14 @@
 
       btnStopMirror.addEventListener('click', stopSenderMirror);
 
-      btnPhoneSendClip.addEventListener('click', () => {
-        const val = phoneClipInput.value.trim();
-        if (!val) return;
-        if (state.dataConn && state.dataConn.open) {
-          state.dataConn.send({ type: 'clip', text: val });
-          appendClipLog(phoneClipLog, 'Phone', val);
-          phoneClipInput.value = '';
-        } else {
-          showToast('Not connected to PC yet.', 'warn');
-        }
-      });
-
       // ==================== INIT ====================
       window.addEventListener('load', () => {
+        const os = detectClientOS();
+        phoneOsLabel.textContent = os === 'ios' ? 'iPhone / iPad (iOS)' : os === 'android' ? 'Android Device' : 'Mobile / Browser';
+        if (os === 'ios') {
+          sourceSelect.value = 'camera_back';
+        }
+
         try {
           const params = new URLSearchParams(window.location.search);
           const joinCode = params.get('join');
@@ -1209,8 +1519,7 @@
             switchTab('sender');
             return;
           }
-          // Automatically switch to Phone Sender on mobile devices
-          if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          if (os === 'ios' || os === 'android') {
             switchTab('sender');
             return;
           }
